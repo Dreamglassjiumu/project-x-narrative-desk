@@ -1,16 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppShell } from './components/layout/AppShell';
-import type { PageKey } from './data';
+import { characters, districts, factions, pois, storylines, type PageKey } from './data';
 import { Dashboard } from './pages/Dashboard';
 import { ArchivePage } from './pages/ArchivePage';
 import { PitchDesk } from './pages/PitchDesk';
 import { LocalLibrary } from './pages/LocalLibrary';
 import { emptyAssetBundle, fetchAssetBundle, flattenAssets, type AssetBundle } from './utils/api';
 
+const mockAssetBundle: AssetBundle = {
+  factions,
+  districts,
+  pois,
+  characters,
+  storylines,
+  pitches: [],
+};
+
 export default function App() {
   const [page, setPage] = useState<PageKey>('dashboard');
   const [query, setQuery] = useState('');
-  const [assets, setAssets] = useState<AssetBundle>(emptyAssetBundle);
+  const [assets, setAssets] = useState<AssetBundle>(mockAssetBundle);
   const [assetError, setAssetError] = useState<string | null>(null);
   const [loadingAssets, setLoadingAssets] = useState(true);
   const allAssets = useMemo(() => flattenAssets(assets), [assets]);
@@ -26,7 +35,10 @@ export default function App() {
         }
       })
       .catch((error: Error) => {
-        if (!cancelled) setAssetError(error.message);
+        if (!cancelled) {
+          setAssets(mockAssetBundle);
+          setAssetError(`${error.message}; using bundled demo dossiers`);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoadingAssets(false);
@@ -50,7 +62,7 @@ export default function App() {
     <AppShell page={page} onNavigate={setPage} query={query} onQueryChange={setQuery}>
       {assetError && page !== 'library' ? (
         <div className="mb-4 border border-crimson/50 bg-burgundy/45 p-3 font-mono text-sm text-paper">
-          LOCAL API OFFLINE · {assetError} · 请先运行 npm run dev:server
+          LOCAL API OFFLINE · {assetError} · 当前使用内置 mock 演示资料；正式本地使用请运行 npm run dev:server
         </div>
       ) : null}
       {content}
