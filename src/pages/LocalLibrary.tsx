@@ -1,5 +1,5 @@
-import { LocalLibraryPlaceholder } from '../components/library/LocalLibraryPlaceholder';
+import { LocalLibraryPanel } from '../components/library/LocalLibraryPanel';
 
 export function LocalLibrary() {
-  return <LocalLibraryPlaceholder />;
+  return <LocalLibraryPanel />;
 }

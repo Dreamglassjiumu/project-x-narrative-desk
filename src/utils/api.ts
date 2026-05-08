@@ -15,6 +15,7 @@ export interface UploadedFileRecord {
   name: string;
   filename: string;
   type: string;
+  folder?: 'images' | 'documents';
   size: number;
   addedAt: string;
   url: string;
