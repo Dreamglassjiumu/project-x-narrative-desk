@@ -1,0 +1,115 @@
+[
+  {
+    "id": "poi-crenchester-ledger-room",
+    "name": "Crenchester Ledger Room",
+    "chineseName": "克伦切斯特账房",
+    "englishName": "Crenchester Ledger Room",
+    "aliases": [
+      "账房",
+      "Ledger Room",
+      "Old Ledger Office"
+    ],
+    "category": "POI",
+    "summary": "一间隐藏在旧修车铺后方的账房，墙上贴满泛黄收据与证物照片。",
+    "details": "适合作为支线接头、账本追踪、帮派冲突升级的室内场景。",
+    "tags": [
+      "evidence",
+      "ledger",
+      "hideout"
+    ],
+    "status": "draft",
+    "spoilerLevel": "secret",
+    "relatedFactionIds": [
+      "faction-9-discipulos"
+    ],
+    "relatedDistrictIds": [
+      "district-crenchester"
+    ],
+    "relatedPoiIds": [],
+    "relatedCharacterIds": [
+      "char-rogue"
+    ],
+    "relatedStorylineIds": [
+      "story-project-x"
+    ],
+    "narrativeConstraints": [
+      "账房不能过早暴露 Project：X 关键证据。"
+    ],
+    "doNotRevealYet": [
+      "保险柜第二层有 Lockhart 相关编号。"
+    ],
+    "sourceNotes": [
+      "POI placeholder for Local Library and pitch detection."
+    ],
+    "districtId": "district-crenchester",
+    "poiTier": "hideout",
+    "realWorldReference": "Back office behind an auto shop.",
+    "addressReference": "Crenchester underpass service lane.",
+    "gameplayUsage": [
+      "调查线索",
+      "潜入",
+      "小规模枪战"
+    ],
+    "storyUsage": [
+      "账本夺回",
+      "线人交易",
+      "秘密揭露前置"
+    ]
+  },
+  {
+    "id": "poi-neon-kabuki",
+    "name": "Neon Kabuki",
+    "chineseName": "霓虹歌舞伎",
+    "englishName": "Neon Kabuki",
+    "aliases": [
+      "Kabuki",
+      "夜场",
+      "Neon Club"
+    ],
+    "category": "POI",
+    "summary": "Little Tokyo 边缘一间半合法夜场，红丝绒包厢和克制霓虹遮住情报买卖。",
+    "details": "适合作为 Grimm Royals 的社交前台、Boss 露面或 Nikki 调查线的转折点。",
+    "tags": [
+      "nightclub",
+      "neon noir",
+      "information"
+    ],
+    "status": "canon",
+    "spoilerLevel": "internal",
+    "relatedFactionIds": [
+      "faction-grimm-royals"
+    ],
+    "relatedDistrictIds": [
+      "district-little-tokyo"
+    ],
+    "relatedPoiIds": [],
+    "relatedCharacterIds": [
+      "char-nikki-lockhart"
+    ],
+    "relatedStorylineIds": [
+      "story-lockhart"
+    ],
+    "narrativeConstraints": [
+      "霓虹只作为 LA 夜生活氛围，不要转向赛博朋克。"
+    ],
+    "doNotRevealYet": [
+      "VIP 房间名单含未公开 Boss 代号。"
+    ],
+    "sourceNotes": [
+      "POI placeholder."
+    ],
+    "districtId": "district-little-tokyo",
+    "poiTier": "business",
+    "realWorldReference": "Old theater converted into nightclub.",
+    "addressReference": "Little Tokyo backstreet marquee.",
+    "gameplayUsage": [
+      "潜入",
+      "对话试探",
+      "尾随目标"
+    ],
+    "storyUsage": [
+      "Nikki 线索推进",
+      "Grimm Royals 社交场"
+    ]
+  }
+]

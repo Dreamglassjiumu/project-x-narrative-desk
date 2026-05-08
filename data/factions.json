@@ -1,0 +1,153 @@
+[
+  {
+    "id": "faction-9-discipulos",
+    "name": "9 Discípulos",
+    "chineseName": "九门徒",
+    "englishName": "9 Discípulos",
+    "aliases": [
+      "9D",
+      "Discípulos",
+      "Nine Disciples"
+    ],
+    "category": "Faction",
+    "summary": "San Libre 南部街区活跃的拉丁裔街头组织，重视符号、领地和家族债务。",
+    "details": "他们的影响力跨过几条被高架桥切开的街区，常以壁画、蜡烛和旧车队留下存在感。",
+    "tags": [
+      "street gang",
+      "south side",
+      "territory"
+    ],
+    "status": "canon",
+    "spoilerLevel": "internal",
+    "relatedFactionIds": [
+      "faction-grimm-royals"
+    ],
+    "relatedDistrictIds": [
+      "district-crenchester"
+    ],
+    "relatedPoiIds": [
+      "poi-crenchester-ledger-room"
+    ],
+    "relatedCharacterIds": [
+      "char-rogue"
+    ],
+    "relatedStorylineIds": [
+      "story-project-x"
+    ],
+    "narrativeConstraints": [
+      "不要把 9 Discípulos 写成单一反派；其内部有家族与生存逻辑。"
+    ],
+    "doNotRevealYet": [
+      "其账本中关于 Project：X 的条目只允许在中后期暗示。"
+    ],
+    "sourceNotes": [
+      "Mock dossier for narrative tooling prototype."
+    ],
+    "factionCategory": "street_organization",
+    "culturalRoot": "San Libre Latino neighborhoods",
+    "territoryDistrictIds": [
+      "district-crenchester"
+    ],
+    "headquartersPoiIds": [
+      "poi-crenchester-ledger-room"
+    ],
+    "coreBusiness": [
+      "保护费",
+      "走私线路",
+      "地下车库交易"
+    ],
+    "allies": [
+      "Rogue 的临时线人网"
+    ],
+    "enemies": [
+      "The Grimm Royals"
+    ],
+    "visualKeywords": [
+      "蜡烛壁画",
+      "低趴车",
+      "红金涂鸦",
+      "旧教堂地下室"
+    ],
+    "missionTypes": [
+      "领地谈判",
+      "账本夺回",
+      "卧底接头"
+    ]
+  },
+  {
+    "id": "faction-grimm-royals",
+    "name": "The Grimm Royals",
+    "chineseName": "格林王族",
+    "englishName": "The Grimm Royals",
+    "aliases": [
+      "Grimm Royals",
+      "Royals",
+      "TGR"
+    ],
+    "category": "Faction",
+    "summary": "以黑色童话和英式帮派礼仪包装自己的跨区犯罪集团。",
+    "details": "成员喜欢把行动称为“章节”，用旧皇冠、乌鸦和金线扑克牌作为符号。",
+    "tags": [
+      "organized crime",
+      "noir",
+      "secretive"
+    ],
+    "status": "draft",
+    "spoilerLevel": "secret",
+    "relatedFactionIds": [
+      "faction-9-discipulos"
+    ],
+    "relatedDistrictIds": [
+      "district-little-tokyo"
+    ],
+    "relatedPoiIds": [
+      "poi-neon-kabuki"
+    ],
+    "relatedCharacterIds": [
+      "char-nikki-lockhart"
+    ],
+    "relatedStorylineIds": [
+      "story-lockhart"
+    ],
+    "narrativeConstraints": [
+      "他们不能直接控制整个 San Libre；权力应表现为精密渗透。"
+    ],
+    "doNotRevealYet": [
+      "Grimm Royals 与 Lockhart 家族旧案的关系需要保密。"
+    ],
+    "sourceNotes": [
+      "Mock faction card for early UI validation."
+    ],
+    "factionCategory": "organized_syndicate",
+    "culturalRoot": "Anglo noir mythology + LA club scene",
+    "territoryDistrictIds": [
+      "district-little-tokyo"
+    ],
+    "headquartersPoiIds": [
+      "poi-neon-kabuki"
+    ],
+    "coreBusiness": [
+      "高端勒索",
+      "夜场洗钱",
+      "艺术品黑市"
+    ],
+    "allies": [
+      "未知律师团"
+    ],
+    "enemies": [
+      "9 Discípulos",
+      "Mike Edge 的旧线人"
+    ],
+    "visualKeywords": [
+      "黑金皇冠",
+      "乌鸦纹章",
+      "红丝绒包厢",
+      "旧童话剪影"
+    ],
+    "missionTypes": [
+      "潜入夜场",
+      "证物交换",
+      "Boss 试炼"
+    ]
+  }
+]

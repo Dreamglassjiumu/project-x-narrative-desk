@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { allAssets } from '../data';
+import type { AnyAsset } from '../data';
 import { AssetCard } from '../components/cards/AssetCard';
 import { PitchEditor } from '../components/pitch/PitchEditor';
 import { PitchInsightPanel } from '../components/pitch/PitchInsightPanel';
@@ -16,11 +16,11 @@ const loadDraft = (): PitchDraft => {
   }
 };
 
-export function PitchDesk() {
+export function PitchDesk({ assets }: { assets: AnyAsset[] }) {
   const [draft, setDraft] = useState<PitchDraft>(loadDraft);
   const [query, setQuery] = useState('');
-  const filtered = useMemo(() => searchAssets(allAssets, query).slice(0, 8), [query]);
-  const detected = useMemo(() => detectAssetMentions(allAssets, serializePitchText(draft)), [draft]);
+  const filtered = useMemo(() => searchAssets(assets, query).slice(0, 8), [assets, query]);
+  const detected = useMemo(() => detectAssetMentions(assets, serializePitchText(draft)), [assets, draft]);
 
   useEffect(() => {
     localStorage.setItem(PITCH_STORAGE_KEY, JSON.stringify(draft));
@@ -34,6 +34,7 @@ export function PitchDesk() {
         <SearchBox value={query} onChange={setQuery} placeholder="在写 pitch 时查资料" />
         <div className="mt-4 space-y-3">
           {filtered.map((asset) => <AssetCard key={asset.id} asset={asset} onSelect={() => setQuery(asset.name)} />)}
+          {filtered.length === 0 ? <p className="border border-dashed border-brass/30 p-3 text-sm text-paper/60">本地 data JSON 暂无匹配资料。</p> : null}
         </div>
       </aside>
       <PitchEditor draft={draft} onChange={setDraft} />
