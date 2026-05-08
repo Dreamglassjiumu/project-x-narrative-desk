@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+body {
+  margin: 0;
+  font-family: theme('fontFamily.body');
+  background:
+    radial-gradient(circle at 15% 10%, rgba(139,31,36,.23), transparent 28%),
+    radial-gradient(circle at 85% 0%, rgba(71,111,103,.14), transparent 24%),
+    linear-gradient(135deg, #21130f 0%, #100b09 45%, #2b1412 100%);
+}
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: .25;
+  background-image:
+    linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.02) 1px, transparent 1px);
+  background-size: 34px 34px;
+}
+
+@layer components {
+  .type-label { @apply font-mono text-xs uppercase tracking-[0.22em]; }
+  .case-card { @apply border border-walnut/25 bg-paper p-4 text-espresso shadow-card transition duration-200 hover:-translate-y-1 hover:rotate-[-0.3deg] hover:shadow-dossier; }
+  .dossier-panel { @apply border border-brass/35 bg-paper text-espresso shadow-dossier; background-image: linear-gradient(rgba(92,55,31,.06) 1px, transparent 1px); background-size: 100% 26px; }
+  .stamp { @apply inline-flex border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.18em]; }
+  .tag-label { @apply inline-flex border border-walnut/25 bg-walnut/10 px-2 py-1 font-mono text-[11px] uppercase tracking-wider text-walnut/75; }
+  .section-title { @apply font-display text-lg text-espresso; }
+  .warning-strip { @apply border-l-4 border-crimson bg-crimson/10 px-3 py-2 text-sm text-espresso/80; }
+  .evidence-button { @apply inline-flex items-center justify-center border border-brass/60 bg-burgundy px-4 py-2 font-mono text-xs uppercase tracking-[0.18em] text-ivory shadow-card transition hover:-translate-y-0.5 hover:bg-crimson hover:shadow-glow; }
+  .paper-input { @apply mt-1 w-full border border-walnut/30 bg-[#ead8b8]/80 px-3 py-2 text-espresso outline-none transition placeholder:text-walnut/40 focus:border-crimson focus:ring-2 focus:ring-crimson/20; }
+  .field-label { @apply font-mono text-xs uppercase tracking-[0.18em] text-walnut/65; }
+  .smoke-overlay { @apply pointer-events-none fixed inset-0 z-0 opacity-40; background: radial-gradient(ellipse at 30% 20%, rgba(216,192,154,.08), transparent 35%), radial-gradient(ellipse at 70% 80%, rgba(74,22,26,.18), transparent 40%); }
+}
