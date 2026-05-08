@@ -13,7 +13,3 @@ export const createLocalLibraryFile = (file: File): LocalLibraryFile => ({
   size: file.size,
   addedAt: new Date().toISOString(),
 });
-
-export const saveFileToIndexedDbPlaceholder = async (_file: File): Promise<void> => {
-  throw new Error('IndexedDB evidence locker is reserved for a later build.');
-};

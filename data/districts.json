@@ -1,0 +1,161 @@
+[
+  {
+    "id": "district-san-libre",
+    "name": "San Libre",
+    "chineseName": "圣利布雷",
+    "englishName": "San Libre",
+    "aliases": [
+      "SL",
+      "the city",
+      "洛杉矶原型城市"
+    ],
+    "category": "District",
+    "summary": "Project：X 的虚构城市舞台，以洛杉矶为原型，阳光、烟雾和犯罪档案同框。",
+    "details": "San Libre 不是现实洛杉矶，而是被案件、帮派地盘和电影感街道重组后的叙事城市。",
+    "tags": [
+      "city",
+      "setting",
+      "los angeles inspired"
+    ],
+    "status": "canon",
+    "spoilerLevel": "public",
+    "relatedFactionIds": [
+      "faction-9-discipulos",
+      "faction-grimm-royals"
+    ],
+    "relatedDistrictIds": [],
+    "relatedPoiIds": [],
+    "relatedCharacterIds": [
+      "char-x",
+      "char-nikki-lockhart",
+      "char-mike-edge"
+    ],
+    "relatedStorylineIds": [
+      "story-project-x"
+    ],
+    "narrativeConstraints": [
+      "不要直接使用现实城市机构名称作为主机构。"
+    ],
+    "doNotRevealYet": [],
+    "sourceNotes": [
+      "World hub entry."
+    ],
+    "realWorldReference": "Los Angeles atmosphere, not a 1:1 map.",
+    "atmosphere": [
+      "日晒棕榈",
+      "海雾高速",
+      "暗红酒吧",
+      "旧警局档案室"
+    ],
+    "dominantFactions": [
+      "9 Discípulos",
+      "The Grimm Royals"
+    ]
+  },
+  {
+    "id": "district-crenchester",
+    "name": "Crenchester",
+    "chineseName": "克伦切斯特",
+    "englishName": "Crenchester",
+    "aliases": [
+      "Crenchester Blocks",
+      "Crench"
+    ],
+    "category": "District",
+    "summary": "高架桥阴影下的工坊与旧住宅区，是账本、改装车和家族债务交叉的街区。",
+    "details": "街区用褪色广告牌、铁网围栏和深夜修车铺构成犯罪 noir 的基层纹理。",
+    "tags": [
+      "industrial",
+      "south side",
+      "ledger"
+    ],
+    "status": "canon",
+    "spoilerLevel": "internal",
+    "relatedFactionIds": [
+      "faction-9-discipulos"
+    ],
+    "relatedDistrictIds": [
+      "district-san-libre"
+    ],
+    "relatedPoiIds": [
+      "poi-crenchester-ledger-room"
+    ],
+    "relatedCharacterIds": [
+      "char-rogue"
+    ],
+    "relatedStorylineIds": [
+      "story-project-x"
+    ],
+    "narrativeConstraints": [
+      "Crenchester 不是贫民窟标签；要呈现居民日常与社区结构。"
+    ],
+    "doNotRevealYet": [
+      "某个废弃账房的真正拥有者暂不公开。"
+    ],
+    "sourceNotes": [
+      "District mock card."
+    ],
+    "realWorldReference": "South/East LA industrial neighborhood mood.",
+    "atmosphere": [
+      "铁锈",
+      "修车铺",
+      "壁画",
+      "黄昏警笛"
+    ],
+    "dominantFactions": [
+      "9 Discípulos"
+    ]
+  },
+  {
+    "id": "district-little-tokyo",
+    "name": "Little Tokyo",
+    "chineseName": "小东京",
+    "englishName": "Little Tokyo",
+    "aliases": [
+      "LT",
+      "Neon Blocks"
+    ],
+    "category": "District",
+    "summary": "霓虹克制、雨后柏油与老剧院共存的街区，是情报交易与夜场行动的常用舞台。",
+    "details": "本条目用于标定 San Libre 的 Little Tokyo 氛围，不等同现实街区。",
+    "tags": [
+      "neon noir",
+      "nightlife",
+      "information"
+    ],
+    "status": "draft",
+    "spoilerLevel": "internal",
+    "relatedFactionIds": [
+      "faction-grimm-royals"
+    ],
+    "relatedDistrictIds": [
+      "district-san-libre"
+    ],
+    "relatedPoiIds": [
+      "poi-neon-kabuki"
+    ],
+    "relatedCharacterIds": [
+      "char-nikki-lockhart"
+    ],
+    "relatedStorylineIds": [
+      "story-lockhart"
+    ],
+    "narrativeConstraints": [
+      "避免把街区写成单一异国化布景；需要日常商业和居民层次。"
+    ],
+    "doNotRevealYet": [],
+    "sourceNotes": [
+      "District mock card."
+    ],
+    "realWorldReference": "Downtown LA Little Tokyo nightlife mood.",
+    "atmosphere": [
+      "低饱和霓虹",
+      "旧戏院",
+      "雨夜路面",
+      "后巷拉门"
+    ],
+    "dominantFactions": [
+      "The Grimm Royals"
+    ]
+  }
+]
