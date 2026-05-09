@@ -5,12 +5,13 @@ import { DetailPanel } from '../components/detail/DetailPanel';
 import { AssetFormDrawer } from '../components/forms/AssetFormDrawer';
 import { ConfirmDialog } from '../components/forms/ConfirmDialog';
 import type { AssetBundle, UploadedFileRecord } from '../utils/api';
-import { createAsset, deleteAsset, updateAsset } from '../utils/api';
+import { archiveErrorMessage, createAsset, deleteAsset, updateAsset } from '../utils/api';
+import type { ArchiveNotifier } from '../components/ui/ArchiveNotice';
 import type { AssetType } from '../utils/assetHelpers';
 import { assetTypeFor } from '../utils/assetHelpers';
 import { getAssetHitTypes, searchAssets, type AssetFilters } from '../utils/search';
 
-export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title, readOnly, onAssetsChanged }: { type: AssetType; assets: AnyAsset[]; bundle: AssetBundle; files: UploadedFileRecord[]; query: string; eyebrow: string; title: string; readOnly: boolean; onAssetsChanged: (bundle: AssetBundle) => void }) {
+export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title, readOnly, onAssetsChanged, notify }: { type: AssetType; assets: AnyAsset[]; bundle: AssetBundle; files: UploadedFileRecord[]; query: string; eyebrow: string; title: string; readOnly: boolean; onAssetsChanged: (bundle: AssetBundle) => void; notify: ArchiveNotifier }) {
   const [filters, setFilters] = useState<AssetFilters>({});
   const filtered = useMemo(() => searchAssets(assets, query, filters), [assets, query, filters]);
   const [selectedId, setSelectedId] = useState<string | undefined>(filtered[0]?.id);
@@ -30,7 +31,7 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
       <div className="mb-5 border border-brass/25 bg-walnut/40 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div><p className="type-label text-brass">{eyebrow}</p><h2 className="font-display text-3xl text-ivory">{title}</h2></div>
-          <div className="flex flex-wrap gap-2"><button disabled={readOnly} onClick={() => setCreating(type)} className="evidence-button disabled:cursor-not-allowed disabled:opacity-50">New Record / 新建档案</button>{type === 'districts' ? <button disabled={readOnly} onClick={() => setCreating('pois')} className="evidence-button disabled:cursor-not-allowed disabled:opacity-50">New POI / 新建地点</button> : null}</div>
+          <div className="flex flex-wrap gap-2"><button disabled={readOnly} title={readOnly ? 'Local API offline. Archive is read-only.' : undefined} onClick={() => setCreating(type)} className="evidence-button disabled:cursor-not-allowed disabled:opacity-50">New Record / 新建档案</button>{type === 'districts' ? <button disabled={readOnly} title={readOnly ? 'Local API offline. Archive is read-only.' : undefined} onClick={() => setCreating('pois')} className="evidence-button disabled:cursor-not-allowed disabled:opacity-50">New POI / 新建地点</button> : null}</div>
         </div>
         {readOnly ? <p className="mt-3 border border-crimson/40 bg-burgundy/45 p-2 font-mono text-xs text-paper">Local API offline. Archive is read-only.</p> : null}
       </div>
@@ -47,9 +48,9 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
         </div>
         <DetailPanel asset={selected} bundle={bundle} files={files} readOnly={readOnly} onOpenRelated={(asset) => setSelectedId(asset.id)} onEdit={setEditing} onDelete={setDeleting} />
       </div>
-      <AssetFormDrawer open={Boolean(creating)} type={creating ?? type} bundle={bundle} onClose={() => setCreating(undefined)} onSubmit={async (asset) => { const recordType = creating ?? type; addRecord(recordType, await createAsset(recordType, asset)); }} />
-      <AssetFormDrawer open={Boolean(editing)} type={editing ? assetTypeFor(editing) : type} asset={editing} bundle={bundle} onClose={() => setEditing(undefined)} onSubmit={async (asset) => { if (!editing) return; const recordType = assetTypeFor(editing); replaceRecord(recordType, await updateAsset(recordType, editing.id, asset)); }} />
-      <ConfirmDialog open={Boolean(deleting)} title="Remove Dossier?" message="This dossier will be removed from the local archive." confirmLabel="DELETE DOSSIER" onCancel={() => setDeleting(undefined)} onConfirm={() => { if (!deleting) return; const recordType = assetTypeFor(deleting); void deleteAsset(recordType, deleting.id).then(() => { removeRecord(recordType, deleting); setDeleting(undefined); }); }} />
+      <AssetFormDrawer open={Boolean(creating)} type={creating ?? type} bundle={bundle} onClose={() => setCreating(undefined)} onSubmit={async (asset) => { try { const recordType = creating ?? type; addRecord(recordType, await createAsset(recordType, asset)); notify({ tone: 'success', title: 'Dossier filed into local archive.' }); } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') }); throw error; } }} />
+      <AssetFormDrawer open={Boolean(editing)} type={editing ? assetTypeFor(editing) : type} asset={editing} bundle={bundle} onClose={() => setEditing(undefined)} onSubmit={async (asset) => { if (!editing) return; try { const recordType = assetTypeFor(editing); replaceRecord(recordType, await updateAsset(recordType, editing.id, asset)); notify({ tone: 'success', title: 'Dossier updated.' }); } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') }); throw error; } }} />
+      <ConfirmDialog open={Boolean(deleting)} title="Remove Dossier?" message="This dossier will be removed from the local archive." confirmLabel="DELETE DOSSIER" onCancel={() => setDeleting(undefined)} onConfirm={() => { if (!deleting) return; const recordType = assetTypeFor(deleting); void deleteAsset(recordType, deleting.id).then(() => { removeRecord(recordType, deleting); setDeleting(undefined); notify({ tone: 'success', title: 'Dossier removed from local archive.' }); }).catch((error) => notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') })); }} />
     </div>
   );
 }

@@ -7,13 +7,14 @@ import { PitchEditor } from '../components/pitch/PitchEditor';
 import { PitchInsightPanel } from '../components/pitch/PitchInsightPanel';
 import { PitchLoader } from '../components/pitch/PitchLoader';
 import { defaultPitchDraft, PITCH_STORAGE_KEY, serializePitchText, type PitchDraft, type SavedPitch } from '../utils/pitch';
-import { createAsset, deletePitch, upsertPitch, type AssetBundle } from '../utils/api';
+import { archiveErrorMessage, createAsset, deletePitch, upsertPitch, type AssetBundle } from '../utils/api';
 import { detectAssetMentions, searchAssets } from '../utils/search';
 import { SearchBox } from '../components/layout/SearchBox';
+import type { ArchiveNotifier } from '../components/ui/ArchiveNotice';
 
 const loadDraft = (): PitchDraft => { try { const raw = localStorage.getItem(PITCH_STORAGE_KEY); return raw ? { ...defaultPitchDraft, ...JSON.parse(raw) } : defaultPitchDraft; } catch { return defaultPitchDraft; } };
 
-export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged }: { assets: AnyAsset[]; bundle: AssetBundle; apiOnline: boolean; onAssetsChanged: (bundle: AssetBundle) => void }) {
+export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }: { assets: AnyAsset[]; bundle: AssetBundle; apiOnline: boolean; onAssetsChanged: (bundle: AssetBundle) => void; notify: ArchiveNotifier }) {
   const [draft, setDraft] = useState<PitchDraft>(loadDraft);
   const [query, setQuery] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -23,16 +24,22 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged }: { asse
 
   const save = async (source: PitchDraft = draft, forceNew = false) => {
     const now = new Date().toISOString();
-    const saved = await upsertPitch({ ...source, id: forceNew ? undefined : source.id, status: source.status ?? 'draft', createdAt: source.createdAt ?? now, updatedAt: now });
-    setDraft(saved);
-    const exists = bundle.pitches.some((pitch) => pitch.id === saved.id);
-    onAssetsChanged({ ...bundle, pitches: exists ? bundle.pitches.map((pitch) => pitch.id === saved.id ? saved : pitch) : [saved, ...bundle.pitches] });
+    try {
+      const saved = await upsertPitch({ ...source, id: forceNew ? undefined : source.id, status: source.status ?? 'draft', createdAt: source.createdAt ?? now, updatedAt: now });
+      setDraft(saved);
+      const exists = bundle.pitches.some((pitch) => pitch.id === saved.id);
+      onAssetsChanged({ ...bundle, pitches: exists ? bundle.pitches.map((pitch) => pitch.id === saved.id ? saved : pitch) : [saved, ...bundle.pitches] });
+      notify({ tone: 'success', title: 'Pitch saved into local archive.' });
+    } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') }); }
   };
   const duplicate = () => void save({ ...draft, id: undefined, title: `${draft.title} Copy`, status: 'draft', createdAt: undefined, updatedAt: undefined }, true);
-  const remove = async () => { if (!draft.id) return; await deletePitch(draft.id); onAssetsChanged({ ...bundle, pitches: bundle.pitches.filter((pitch) => pitch.id !== draft.id) }); setDraft(defaultPitchDraft); setConfirmDelete(false); };
+  const remove = async () => { if (!draft.id) return; try { await deletePitch(draft.id); onAssetsChanged({ ...bundle, pitches: bundle.pitches.filter((pitch) => pitch.id !== draft.id) }); setDraft(defaultPitchDraft); setConfirmDelete(false); notify({ tone: 'success', title: 'Pitch removed from local archive.' }); } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') }); } };
   const convert = async () => {
+    try {
     const storyline = await createAsset<Storyline>('storylines', { name: draft.title || 'Untitled Storyline Draft', chineseName: draft.title || '', englishName: draft.title || '', category: 'Storyline', summary: draft.logline, details: serializePitchText(draft), tags: ['pitch-conversion'], status: 'draft', spoilerLevel: 'internal', aliases: [], relatedFactionIds: detected.filter((a) => 'factionCategory' in a).map((a) => a.id), relatedDistrictIds: detected.filter((a) => 'atmosphere' in a).map((a) => a.id), relatedPoiIds: detected.filter((a) => 'poiTier' in a).map((a) => a.id), relatedCharacterIds: detected.filter((a) => 'characterType' in a).map((a) => a.id), relatedStorylineIds: [], narrativeConstraints: [], doNotRevealYet: [], sourceNotes: [`Converted from pitch ${draft.id ?? draft.title}`], storylineType: draft.type === '主线' ? 'main' : 'side', act: '', mainConflict: draft.coreConflict, playerGoal: draft.playerGoal, endingState: draft.ending, timelinePlacement: '', pitchStatus: 'under_review' });
     onAssetsChanged({ ...bundle, storylines: [storyline, ...bundle.storylines] });
+    notify({ tone: 'success', title: 'Storyline draft filed into local archive.' });
+    } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') }); }
   };
 
   return (
