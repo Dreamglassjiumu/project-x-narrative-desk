@@ -75,7 +75,7 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
     }
   };
 
-  const formTitle = `${asset ? 'Edit' : 'New'} ${template?.title ?? formTitleLabels[type] ?? assetTypeLabels[type]} Record`;
+  const formTitle = `${asset ? 'Edit' : 'New'} ${template?.englishName ?? formTitleLabels[type] ?? assetTypeLabels[type]} Record`;
   const allAssets = [...bundle.factions, ...bundle.districts, ...bundle.pois, ...bundle.characters, ...bundle.storylines] as AnyAsset[];
   const duplicateHits = detectDuplicates(draft as Partial<AnyAsset>, allAssets, asset?.id || String(draft.id || ''));
   const preferred = template?.preferredFields ?? [];
