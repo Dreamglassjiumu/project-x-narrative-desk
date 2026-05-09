@@ -1,6 +1,10 @@
 export type PitchType = '主线' | '支线' | '角色任务' | '区域任务' | '帮派任务';
 
 export interface PitchDraft {
+  id?: string;
+  status?: 'draft' | 'under_review' | 'canon' | 'deprecated';
+  createdAt?: string;
+  updatedAt?: string;
   title: string;
   type: PitchType;
   logline: string;
@@ -16,6 +20,13 @@ export interface PitchDraft {
   futureHooks: string;
   newLore: string;
   possibleConflicts: string;
+}
+
+export interface SavedPitch extends PitchDraft {
+  id: string;
+  status: 'draft' | 'under_review' | 'canon' | 'deprecated';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export const PITCH_STORAGE_KEY = 'project-x-narrative-desk:pitch-draft';

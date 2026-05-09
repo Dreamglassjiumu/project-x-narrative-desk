@@ -11,6 +11,8 @@ const getAssetPath = (type) => {
   return fileName ? path.join(dataDir, fileName) : undefined;
 };
 
+const idPrefixes = { factions: 'faction', districts: 'district', pois: 'poi', characters: 'char', storylines: 'story', pitches: 'pitch' };
+
 const normalizeId = (value, prefix = 'asset') => {
   if (typeof value === 'string' && value.trim()) return value.trim();
   return `${prefix}-${crypto.randomUUID()}`;
@@ -42,7 +44,7 @@ router.post('/:type', async (req, res, next) => {
     const filePath = getAssetPath(req.params.type);
     if (!filePath) return res.status(404).json({ error: `Unknown asset type: ${req.params.type}` });
     const records = await readJsonArray(filePath);
-    const record = { ...req.body, id: normalizeId(req.body?.id, req.params.type.replace(/s$/, '') || 'asset') };
+    const record = { ...req.body, id: normalizeId(req.body?.id, idPrefixes[req.params.type] ?? 'asset') };
     if (records.some((item) => item.id === record.id)) {
       return res.status(409).json({ error: `Asset already exists: ${record.id}` });
     }

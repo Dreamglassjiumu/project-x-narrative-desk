@@ -64,6 +64,10 @@ export interface District extends NarrativeAsset {
   realWorldReference: string;
   atmosphere: string[];
   dominantFactions: string[];
+  keyPoiIds?: string[];
+  storyUsage?: string[];
+  gameplayUsage?: string[];
+  districtStatus?: string;
 }
 
 export interface Poi extends NarrativeAsset {
@@ -76,9 +80,16 @@ export interface Poi extends NarrativeAsset {
 }
 
 export interface Storyline extends NarrativeAsset {
-  storylineType: 'main' | 'side' | 'character' | 'district' | 'faction';
-  timeline: string;
+  storylineType: 'main' | 'side' | 'character' | 'district' | 'faction' | 'prologue' | 'event';
+  timeline?: string;
   act: string;
+  relatedPlayableCharacters?: string[];
+  relatedBosses?: string[];
+  mainConflict?: string;
+  playerGoal?: string;
+  endingState?: string;
+  timelinePlacement?: string;
+  pitchStatus?: string;
 }
 
 export type AnyAsset = NarrativeAsset | Character | Faction | District | Poi | Storyline;

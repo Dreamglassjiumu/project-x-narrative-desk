@@ -11,7 +11,7 @@ const titleMap: Record<PageKey, string> = {
   library: 'Local Library / 本地证物柜',
 };
 
-export function TopBar({ page, query, onQueryChange }: { page: PageKey; query: string; onQueryChange: (value: string) => void }) {
+export function TopBar({ page, query, onQueryChange, apiOnline }: { page: PageKey; query: string; onQueryChange: (value: string) => void; apiOnline: boolean }) {
   return (
     <header className="sticky top-0 z-20 border-b border-brass/20 bg-espresso/90 p-4 backdrop-blur-sm">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -22,7 +22,7 @@ export function TopBar({ page, query, onQueryChange }: { page: PageKey; query: s
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <SearchBox value={query} onChange={onQueryChange} />
           <div className="border border-teal/40 bg-police/30 px-3 py-2 font-mono text-xs text-paper/75">
-            SYSTEM: LOCAL ONLY · AUTOSAVE ARMED · 1978-B
+            {apiOnline ? 'LOCAL JSON SYNC READY' : 'LOCAL API OFFLINE · READ ONLY'} · SYSTEM: LOCAL ONLY
           </div>
         </div>
       </div>

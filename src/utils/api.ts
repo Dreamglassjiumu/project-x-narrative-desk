@@ -1,5 +1,6 @@
 import type { AnyAsset, Character, District, Faction, Poi, Storyline } from '../data/types';
-import type { PitchDraft } from './pitch';
+import type { AssetType } from './assetHelpers';
+import type { PitchDraft, SavedPitch } from './pitch';
 
 export interface AssetBundle {
   factions: Faction[];
@@ -7,7 +8,7 @@ export interface AssetBundle {
   pois: Poi[];
   characters: Character[];
   storylines: Storyline[];
-  pitches: PitchDraft[];
+  pitches: SavedPitch[];
 }
 
 export interface UploadedFileRecord {
@@ -19,6 +20,13 @@ export interface UploadedFileRecord {
   size: number;
   addedAt: string;
   url: string;
+  tags: string[];
+  linkedAssetIds: string[];
+}
+
+export interface ArchiveExport extends Partial<AssetBundle> {
+  exportedAt: string;
+  version: string;
 }
 
 export const emptyAssetBundle: AssetBundle = {
@@ -36,6 +44,7 @@ const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Pro
     const body = await response.json().catch(() => undefined);
     throw new Error(body?.error ?? `${response.status} ${response.statusText}`);
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 };
 
@@ -49,18 +58,39 @@ export const flattenAssets = (bundle: AssetBundle): AnyAsset[] => [
   ...bundle.storylines,
 ];
 
+export const createAsset = <T extends AnyAsset>(type: AssetType, asset: Partial<T>) =>
+  requestJson<T>(`/api/assets/${type}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(asset) });
+
+export const updateAsset = <T extends AnyAsset>(type: AssetType, id: string, asset: Partial<T>) =>
+  requestJson<T>(`/api/assets/${type}/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(asset) });
+
+export const deleteAsset = (type: AssetType, id: string) =>
+  requestJson<void>(`/api/assets/${type}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
 export const listUploads = () => requestJson<UploadedFileRecord[]>('/api/uploads');
 
-export const uploadFiles = async (files: FileList | File[]) => {
+export const uploadFiles = async (files: FileList | File[], metadata?: { tags?: string[]; linkedAssetIds?: string[] }) => {
   const formData = new FormData();
   Array.from(files).forEach((file) => formData.append('files', file));
+  if (metadata?.tags) formData.append('tags', JSON.stringify(metadata.tags));
+  if (metadata?.linkedAssetIds) formData.append('linkedAssetIds', JSON.stringify(metadata.linkedAssetIds));
   return requestJson<UploadedFileRecord[]>('/api/uploads', { method: 'POST', body: formData });
 };
 
-export const deleteUpload = async (id: string) => {
-  const response = await fetch(`/api/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' });
-  if (!response.ok) {
-    const body = await response.json().catch(() => undefined);
-    throw new Error(body?.error ?? `${response.status} ${response.statusText}`);
-  }
+export const updateUpload = (id: string, metadata: { tags?: string[]; linkedAssetIds?: string[] }) =>
+  requestJson<UploadedFileRecord>(`/api/uploads/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) });
+
+export const deleteUpload = async (id: string) => requestJson<void>(`/api/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+export const savePitch = (pitch: Partial<SavedPitch> & PitchDraft) =>
+  requestJson<SavedPitch>('/api/assets/pitches', { method: pitch.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pitch) });
+
+export const upsertPitch = (pitch: Partial<SavedPitch> & PitchDraft) => {
+  if (pitch.id) return requestJson<SavedPitch>(`/api/assets/pitches/${encodeURIComponent(pitch.id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pitch) });
+  return requestJson<SavedPitch>('/api/assets/pitches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(pitch) });
 };
+export const deletePitch = (id: string) => deleteAsset('pitches' as AssetType, id);
+
+export const exportArchive = () => requestJson<ArchiveExport>('/api/backup/export');
+export const importArchive = (payload: ArchiveExport, mode: 'merge' | 'replace') =>
+  requestJson<AssetBundle>('/api/backup/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, mode }) });
