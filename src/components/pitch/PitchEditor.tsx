@@ -1,26 +1,184 @@
+import { useMemo, useState } from 'react';
 import type { AnyAsset, Character, District, Faction, Poi, Storyline } from '../../data';
 import type { PitchDraft } from '../../utils/pitch';
 import { exportPitchMarkdown, pitchOutlineTemplate, pitchStatuses, pitchTypes } from '../../utils/pitch';
 
 type LinkKey = 'linkedCharacterIds' | 'linkedFactionIds' | 'linkedDistrictIds' | 'linkedPoiIds' | 'linkedStorylineIds';
 
-const MultiAssetPicker = ({ label, assets, value, onChange }: { label: string; assets: AnyAsset[]; value: string[]; onChange: (ids: string[]) => void }) => (
-  <label className="block">
-    <span className="field-label">{label}</span>
-    <select
-      multiple
-      value={value}
-      onChange={(event) => onChange(Array.from(event.currentTarget.selectedOptions, (option) => option.value))}
-      className="paper-input min-h-24 text-sm"
-    >
-      {assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.name} · {asset.category}</option>)}
-    </select>
-  </label>
-);
+type DossierGroup = {
+  key: LinkKey;
+  title: string;
+  summaryLabel: string;
+  addLabel: string;
+  emptyLabel: string;
+  assets: AnyAsset[];
+};
+
+const matchesArchivePickerQuery = (asset: AnyAsset, query: string): boolean => {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+  return [asset.name, asset.chineseName, asset.englishName, ...asset.aliases]
+    .filter(Boolean)
+    .some((term) => term.toLowerCase().includes(normalized));
+};
+
+const assetDisplayName = (asset: AnyAsset): string => asset.name || asset.englishName || asset.chineseName || asset.id;
+
+function LinkedDossierGroup({ group, selectedIds, pickerOpen, query, onOpenPicker, onClosePicker, onQueryChange, onAdd, onRemove }: {
+  group: DossierGroup;
+  selectedIds: string[];
+  pickerOpen: boolean;
+  query: string;
+  onOpenPicker: () => void;
+  onClosePicker: () => void;
+  onQueryChange: (query: string) => void;
+  onAdd: (id: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const assetsById = useMemo(() => new Map(group.assets.map((asset) => [asset.id, asset])), [group.assets]);
+  const filteredAssets = useMemo(
+    () => group.assets.filter((asset) => matchesArchivePickerQuery(asset, query)).slice(0, 10),
+    [group.assets, query],
+  );
+
+  return (
+    <div className="relative border border-walnut/20 bg-[#ead8b8]/35 p-3 shadow-card">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="type-label text-[10px] text-crimson">{group.title}</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-walnut/60">{selectedIds.length} filed</p>
+        </div>
+        <button type="button" className="stamp border-brass bg-brass/10 text-walnut shadow-card transition hover:-translate-y-0.5 hover:bg-brass/20" onClick={onOpenPicker}>
+          + {group.addLabel}
+        </button>
+      </div>
+
+      <div className="mt-3 flex max-h-24 min-h-10 flex-wrap gap-2 overflow-y-auto pr-1">
+        {selectedIds.length ? selectedIds.map((id) => {
+          const asset = assetsById.get(id);
+          return (
+            <span key={id} className="inline-flex max-w-full rotate-[-0.4deg] items-center gap-2 border border-walnut/35 bg-paper/90 px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.12em] text-espresso shadow-card">
+              <span className="truncate">{asset ? assetDisplayName(asset) : `Missing dossier ${id}`}</span>
+              <button type="button" className="text-crimson transition hover:scale-125" aria-label={`Remove ${asset ? assetDisplayName(asset) : id}`} onClick={() => onRemove(id)}>×</button>
+            </span>
+          );
+        }) : <p className="font-mono text-xs italic text-walnut/50">{group.emptyLabel}</p>}
+      </div>
+
+      {pickerOpen ? (
+        <div className="absolute right-2 top-12 z-20 w-[min(28rem,calc(100vw-3rem))] border border-brass/50 bg-espresso p-3 text-paper shadow-dossier">
+          <div className="flex items-start justify-between gap-3 border-b border-brass/25 pb-2">
+            <div>
+              <p className="type-label text-brass">ARCHIVE PICKER / 档案选择器</p>
+              <h4 className="font-display text-xl text-ivory">{group.addLabel}</h4>
+            </div>
+            <button type="button" className="stamp border-paper/40 text-paper/75" onClick={onClosePicker}>CLOSE</button>
+          </div>
+          <input
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            className="mt-3 w-full border border-brass/40 bg-[#1c120f] px-3 py-2 font-mono text-sm text-paper outline-none placeholder:text-paper/35 focus:border-crimson focus:ring-2 focus:ring-crimson/30"
+            placeholder="Search name / chineseName / englishName / aliases"
+            autoFocus
+          />
+          <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
+            {filteredAssets.map((asset) => {
+              const selected = selectedIdSet.has(asset.id);
+              return (
+                <button
+                  key={asset.id}
+                  type="button"
+                  className={`w-full border p-2 text-left transition ${selected ? 'border-teal/70 bg-teal/15 text-paper/70' : 'border-brass/25 bg-paper/10 hover:-translate-y-0.5 hover:border-brass/70 hover:bg-paper/15'}`}
+                  onClick={() => onAdd(asset.id)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-display text-lg text-ivory">{assetDisplayName(asset)}</p>
+                      <p className="truncate font-mono text-[11px] uppercase tracking-[0.14em] text-brass/75">{asset.chineseName} · {asset.englishName}</p>
+                    </div>
+                    <span className={`stamp shrink-0 ${selected ? 'border-teal text-teal' : 'border-brass text-brass'}`}>{selected ? 'SELECTED' : 'ADD'}</span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-paper/65">{asset.aliases.length ? `Aliases: ${asset.aliases.join(', ')}` : asset.summary}</p>
+                </button>
+              );
+            })}
+            {filteredAssets.length === 0 ? <p className="border border-dashed border-brass/30 p-3 text-sm text-paper/55">No dossiers match this search.</p> : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function LinkedDossiersPanel({ groups, draft, onUpdateLinks }: { groups: DossierGroup[]; draft: PitchDraft; onUpdateLinks: (key: LinkKey, ids: string[]) => void }) {
+  const [expanded, setExpanded] = useState(false);
+  const [activePicker, setActivePicker] = useState<LinkKey | undefined>();
+  const [queries, setQueries] = useState<Record<LinkKey, string>>({
+    linkedCharacterIds: '',
+    linkedFactionIds: '',
+    linkedDistrictIds: '',
+    linkedPoiIds: '',
+    linkedStorylineIds: '',
+  });
+
+  const totalLinked = groups.reduce((sum, group) => sum + draft[group.key].length, 0);
+  const summary = groups.map((group) => `${group.summaryLabel} ${draft[group.key].length}`).join(' · ');
+
+  const addLink = (key: LinkKey, id: string) => {
+    const currentIds = draft[key];
+    if (currentIds.includes(id)) return;
+    onUpdateLinks(key, [...currentIds, id]);
+  };
+
+  const removeLink = (key: LinkKey, id: string) => onUpdateLinks(key, draft[key].filter((linkedId) => linkedId !== id));
+
+  return (
+    <section className="mt-4 border border-brass/35 bg-walnut/10 p-3 shadow-card">
+      <button type="button" className="flex w-full flex-wrap items-center justify-between gap-3 text-left" onClick={() => setExpanded((current) => !current)}>
+        <div>
+          <p className="type-label text-crimson">LINKED DOSSIERS / 关联档案</p>
+          <p className="mt-1 font-mono text-xs uppercase tracking-[0.16em] text-walnut/65">{summary}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="stamp border-brass bg-brass/10 text-walnut">{totalLinked} linked</span>
+          <span className="stamp border-walnut/50 text-walnut">{expanded ? 'COLLAPSE' : 'EXPAND'}</span>
+        </div>
+      </button>
+
+      {expanded ? (
+        <div className="mt-3 grid gap-3 lg:grid-cols-2">
+          {groups.map((group) => (
+            <LinkedDossierGroup
+              key={group.key}
+              group={group}
+              selectedIds={draft[group.key]}
+              pickerOpen={activePicker === group.key}
+              query={queries[group.key]}
+              onOpenPicker={() => setActivePicker((current) => current === group.key ? undefined : group.key)}
+              onClosePicker={() => setActivePicker(undefined)}
+              onQueryChange={(query) => setQueries((current) => ({ ...current, [group.key]: query }))}
+              onAdd={(id) => addLink(group.key, id)}
+              onRemove={(id) => removeLink(group.key, id)}
+            />
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
+}
 
 export function PitchEditor({ draft, assets, onChange }: { draft: PitchDraft; assets: { characters: Character[]; factions: Faction[]; districts: District[]; pois: Poi[]; storylines: Storyline[] }; onChange: (draft: PitchDraft) => void }) {
   const update = <K extends keyof PitchDraft>(key: K, value: PitchDraft[K]) => onChange({ ...draft, [key]: value });
   const updateLinks = (key: LinkKey, value: string[]) => update(key, value as PitchDraft[typeof key]);
+
+  const dossierGroups: DossierGroup[] = useMemo(() => [
+    { key: 'linkedCharacterIds', title: 'Characters', summaryLabel: 'Characters', addLabel: 'Add Character', emptyLabel: 'No character dossiers linked.', assets: assets.characters },
+    { key: 'linkedFactionIds', title: 'Factions', summaryLabel: 'Factions', addLabel: 'Add Faction', emptyLabel: 'No faction dossiers linked.', assets: assets.factions },
+    { key: 'linkedDistrictIds', title: 'Districts', summaryLabel: 'Districts', addLabel: 'Add District', emptyLabel: 'No district dossiers linked.', assets: assets.districts },
+    { key: 'linkedPoiIds', title: 'POIs', summaryLabel: 'POIs', addLabel: 'Add POI', emptyLabel: 'No POI dossiers linked.', assets: assets.pois },
+    { key: 'linkedStorylineIds', title: 'Storylines', summaryLabel: 'Storylines', addLabel: 'Add Storyline', emptyLabel: 'No storyline dossiers linked.', assets: assets.storylines },
+  ], [assets]);
 
   const downloadMarkdown = () => {
     const markdown = exportPitchMarkdown(draft, [...assets.characters, ...assets.factions, ...assets.districts, ...assets.pois, ...assets.storylines]);
@@ -71,20 +229,14 @@ export function PitchEditor({ draft, assets, onChange }: { draft: PitchDraft; as
         </label>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-5">
-        <MultiAssetPicker label="Linked Characters / 涉及人物" assets={assets.characters} value={draft.linkedCharacterIds} onChange={(ids) => updateLinks('linkedCharacterIds', ids)} />
-        <MultiAssetPicker label="Linked Factions / 涉及帮派" assets={assets.factions} value={draft.linkedFactionIds} onChange={(ids) => updateLinks('linkedFactionIds', ids)} />
-        <MultiAssetPicker label="Linked Districts / 发生区域" assets={assets.districts} value={draft.linkedDistrictIds} onChange={(ids) => updateLinks('linkedDistrictIds', ids)} />
-        <MultiAssetPicker label="Linked POIs / 涉及地点" assets={assets.pois} value={draft.linkedPoiIds} onChange={(ids) => updateLinks('linkedPoiIds', ids)} />
-        <MultiAssetPicker label="Linked Storylines / 关联旧剧情" assets={assets.storylines} value={draft.linkedStorylineIds} onChange={(ids) => updateLinks('linkedStorylineIds', ids)} />
-      </div>
+      <LinkedDossiersPanel groups={dossierGroups} draft={draft} onUpdateLinks={updateLinks} />
 
       <label className="mt-5 block">
         <span className="field-label">Pitch Body / Pitch 正文</span>
         <textarea
           value={draft.body}
           onChange={(event) => update('body', event.target.value)}
-          className="paper-input min-h-[560px] resize-y font-mono text-base leading-7 shadow-inner"
+          className="paper-input min-h-[620px] resize-y font-mono text-base leading-7 shadow-inner"
           placeholder="Type the case proposal here... / 在这里写主线、支线 pitch 正文……"
         />
       </label>
