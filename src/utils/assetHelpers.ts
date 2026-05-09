@@ -55,7 +55,7 @@ export const normalizeAssetPayload = (type: AssetType, value: Partial<AnyAsset>)
   };
 
   if (type === 'characters') return { ...base, characterType: 'story_npc', gender: '', age: '', nationality: '', ethnicity: '', occupation: '', weapon: '', attribute: '', playableScripts: [], characterArc: '', currentTimelineStatus: '', ...(value as object) } as AnyAsset;
-  if (type === 'factions') return { ...base, factionCategory: '', culturalRoot: '', territoryDistrictIds: [], headquartersPoiIds: [], coreBusiness: [], allies: [], enemies: [], visualKeywords: [], missionTypes: [], ...(value as object) } as AnyAsset;
+  if (type === 'factions') return { ...base, factionCategory: '', culturalRoot: [], territoryDistrictIds: [], headquartersPoiIds: [], coreBusiness: [], allies: [], enemies: [], visualKeywords: [], missionTypes: [], ...(value as object) } as AnyAsset;
   if (type === 'districts') return { ...base, realWorldReference: '', atmosphere: [], dominantFactions: [], keyPoiIds: [], storyUsage: [], gameplayUsage: [], districtStatus: '', ...(value as object) } as AnyAsset;
   if (type === 'pois') return { ...base, districtId: '', poiTier: 'landmark', realWorldReference: '', addressReference: '', gameplayUsage: [], storyUsage: [], ...(value as object) } as AnyAsset;
   return { ...base, storylineType: 'side', act: '', relatedPlayableCharacters: [], relatedBosses: [], mainConflict: '', playerGoal: '', endingState: '', timelinePlacement: '', pitchStatus: 'under_review', ...(value as object) } as AnyAsset;

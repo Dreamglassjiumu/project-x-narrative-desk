@@ -57,13 +57,13 @@ export default function App() {
 
   const archiveProps = { bundle: assets, files, query, readOnly: !apiOnline, onAssetsChanged: setAssets, notify };
   const content = {
-    dashboard: <Dashboard assets={assets} allAssets={allAssets} onSelectPage={setPage} loading={loadingAssets} error={assetError} />,
+    dashboard: <Dashboard assets={assets} files={files} allAssets={allAssets} onSelectPage={setPage} loading={loadingAssets} error={assetError} />,
     factions: <ArchivePage {...archiveProps} type="factions" assets={assets.factions} eyebrow="GANG LEDGER" title="Factions / 帮派档案" />,
     districts: <ArchivePage {...archiveProps} type="districts" assets={districtAssets} eyebrow="CITY MAP & POI" title="Districts & POI / 区域与地点" />,
     characters: <ArchivePage {...archiveProps} type="characters" assets={assets.characters} eyebrow="MUGSHOT DOSSIERS" title="Characters / 角色卷宗" />,
     storylines: <ArchivePage {...archiveProps} type="storylines" assets={assets.storylines} eyebrow="TYPEWRITER THREADS" title="Storylines / 剧本线索" />,
     pitch: <PitchDesk bundle={assets} assets={allAssets} apiOnline={apiOnline} onAssetsChanged={setAssets} notify={notify} />,
-    library: <LocalLibrary bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} notify={notify} onAssetsImported={(bundle) => { setAssets(bundle); void refreshAssets().catch(() => undefined); }} />,
+    library: <LocalLibrary bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} onAssetsChanged={setAssets} notify={notify} onAssetsImported={(bundle) => { setAssets(bundle); void refreshAssets().catch(() => undefined); }} />,
   }[page];
 
   return (

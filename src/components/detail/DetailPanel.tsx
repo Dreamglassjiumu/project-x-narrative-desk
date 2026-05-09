@@ -1,6 +1,9 @@
 import type { AnyAsset } from '../../data';
 import type { AssetBundle, UploadedFileRecord } from '../../utils/api';
 import { assetTypeFor, linkedFilesForAsset, makeAssetIndex } from '../../utils/assetHelpers';
+import { getCompleteness } from '../../utils/completeness';
+import { CompletenessBadge } from '../intake/CompletenessBadge';
+import { MissingFieldsList } from '../intake/MissingFieldsList';
 import { ClassifiedBadge } from '../ui/ClassifiedBadge';
 import { StatusStamp } from '../ui/StatusStamp';
 import { LinkedFileList } from './LinkedFileList';
@@ -27,6 +30,7 @@ export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, 
   const index = makeAssetIndex(bundle);
   const related = relationKeys.flatMap((key) => asset[key].map((id) => index.get(id))).filter(Boolean) as Array<{ asset: AnyAsset; type: ReturnType<typeof assetTypeFor> }>;
   const linked = linkedFilesForAsset(files, asset.id);
+  const completeness = getCompleteness(asset, files);
 
   return (
     <aside className="dossier-panel p-6">
@@ -38,12 +42,14 @@ export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, 
           {asset.spoilerLevel === 'secret' ? <p className="mt-2 inline-block -rotate-2 border-2 border-crimson px-3 py-1 font-mono text-xl font-black uppercase tracking-[0.25em] text-crimson">CLASSIFIED</p> : null}
         </div>
         <div className="flex flex-col gap-2">
+          <CompletenessBadge result={completeness} />
           <StatusStamp status={asset.status} />
           <ClassifiedBadge level={asset.spoilerLevel} />
           <button className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? 'Local API offline. Archive is read-only.' : undefined} onClick={() => onEdit?.(asset)}>EDIT</button>
           <button className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? 'Local API offline. Archive is read-only.' : undefined} onClick={() => onDelete?.(asset)}>DELETE</button>
         </div>
       </div>
+      <section className="mb-5"><MissingFieldsList result={completeness} /></section>
       <section><h3 className="section-title">Summary</h3><p className="mt-2 leading-7 text-espresso/85">{asset.summary}</p></section>
       <section className="mt-5"><h3 className="section-title">Details</h3><p className="mt-2 whitespace-pre-wrap leading-7 text-espresso/85">{asset.details}</p></section>
       <section className="mt-5 flex flex-wrap gap-2">{asset.tags.map((tag) => <span key={tag} className="tag-label">{tag}</span>)}{asset.aliases.map((alias) => <span key={alias} className="tag-label border-walnut/30 text-walnut/70">AKA {alias}</span>)}</section>
