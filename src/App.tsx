@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import { ArchivePage } from './pages/ArchivePage';
 import { PitchDesk } from './pages/PitchDesk';
 import { LocalLibrary } from './pages/LocalLibrary';
+import { EvidenceIntake } from './pages/EvidenceIntake';
 import { emptyAssetBundle, fetchAssetBundle, flattenAssets, listUploads, type AssetBundle, type UploadedFileRecord } from './utils/api';
 import { ArchiveNoticeStack, type ArchiveNoticeMessage, type ArchiveNotifier } from './components/ui/ArchiveNotice';
 
@@ -64,6 +65,7 @@ export default function App() {
     storylines: <ArchivePage {...archiveProps} type="storylines" assets={assets.storylines} eyebrow="TYPEWRITER THREADS" title="Storylines / 剧本线索" />,
     pitch: <PitchDesk bundle={assets} assets={allAssets} apiOnline={apiOnline} onAssetsChanged={setAssets} notify={notify} />,
     library: <LocalLibrary bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} onAssetsChanged={setAssets} notify={notify} onAssetsImported={(bundle) => { setAssets(bundle); void refreshAssets().catch(() => undefined); }} />,
+    intake: <EvidenceIntake bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} onAssetsChanged={setAssets} notify={notify} />,
   }[page];
 
   return (
