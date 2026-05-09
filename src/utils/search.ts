@@ -40,8 +40,14 @@ export const searchAssets = (assets: AnyAsset[], query: string, filters: AssetFi
   });
 };
 
+const matchesTerm = (normalizedText: string, term: string): boolean => {
+  if (term.length > 1) return normalizedText.includes(term);
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(normalizedText);
+};
+
 export const detectAssetMentions = (assets: AnyAsset[], text: string): AnyAsset[] => {
   const normalized = text.toLowerCase();
   if (!normalized.trim()) return [];
-  return assets.filter((asset) => getSearchTerms(asset).some((term) => term.length > 1 && normalized.includes(term)));
+  return assets.filter((asset) => getSearchTerms(asset).some((term) => term && matchesTerm(normalized, term)));
 };
