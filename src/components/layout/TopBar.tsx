@@ -9,6 +9,7 @@ const titleMap: Record<PageKey, string> = {
   storylines: 'Storylines / 剧本线索',
   pitch: 'Pitch Desk / 案件提案桌',
   library: 'Local Library / 本地证物柜',
+  intake: 'Evidence Intake / 证物接收台',
 };
 
 export function TopBar({ page, query, onQueryChange, apiOnline }: { page: PageKey; query: string; onQueryChange: (value: string) => void; apiOnline: boolean }) {

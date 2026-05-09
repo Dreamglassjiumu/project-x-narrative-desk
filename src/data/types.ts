@@ -94,4 +94,4 @@ export interface Storyline extends NarrativeAsset {
 
 export type AnyAsset = NarrativeAsset | Character | Faction | District | Poi | Storyline;
 
-export type PageKey = 'dashboard' | 'factions' | 'districts' | 'characters' | 'storylines' | 'pitch' | 'library';
+export type PageKey = 'dashboard' | 'factions' | 'districts' | 'characters' | 'storylines' | 'pitch' | 'library' | 'intake';

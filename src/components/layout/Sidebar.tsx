@@ -8,6 +8,7 @@ const items: Array<{ key: PageKey; label: string; code: string }> = [
   { key: 'storylines', label: 'Storylines', code: '61' },
   { key: 'pitch', label: 'Pitch Desk', code: 'PX' },
   { key: 'library', label: 'Local Library', code: 'EV' },
+  { key: 'intake', label: 'Evidence Intake', code: 'IN' },
 ];
 
 export function Sidebar({ currentPage, onNavigate }: { currentPage: PageKey; onNavigate: (page: PageKey) => void }) {
