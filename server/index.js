@@ -1,6 +1,7 @@
 import express from 'express';
 import assetsRouter from './routes/assets.js';
 import uploadsRouter, { streamUploadedFile } from './routes/uploads.js';
+import backupRouter from './routes/backup.js';
 import { dataDir, documentsDir, imagesDir, uploadsDir } from './utils/paths.js';
 import { ensureWorkspace } from './utils/jsonStore.js';
 
@@ -29,6 +30,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/assets', assetsRouter);
 app.use('/api/uploads', uploadsRouter);
+app.use('/api/backup', backupRouter);
 app.get('/uploads/:folder/:id', streamUploadedFile);
 
 app.use((error, _req, res, _next) => {

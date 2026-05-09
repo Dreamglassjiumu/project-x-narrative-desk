@@ -5,66 +5,63 @@ import { Dashboard } from './pages/Dashboard';
 import { ArchivePage } from './pages/ArchivePage';
 import { PitchDesk } from './pages/PitchDesk';
 import { LocalLibrary } from './pages/LocalLibrary';
-import { emptyAssetBundle, fetchAssetBundle, flattenAssets, type AssetBundle } from './utils/api';
+import { emptyAssetBundle, fetchAssetBundle, flattenAssets, listUploads, type AssetBundle, type UploadedFileRecord } from './utils/api';
 
-const mockAssetBundle: AssetBundle = {
-  factions,
-  districts,
-  pois,
-  characters,
-  storylines,
-  pitches: [],
-};
+const mockAssetBundle: AssetBundle = { factions, districts, pois, characters, storylines, pitches: [] };
 
 export default function App() {
   const [page, setPage] = useState<PageKey>('dashboard');
   const [query, setQuery] = useState('');
   const [assets, setAssets] = useState<AssetBundle>(mockAssetBundle);
+  const [files, setFiles] = useState<UploadedFileRecord[]>([]);
   const [assetError, setAssetError] = useState<string | null>(null);
   const [loadingAssets, setLoadingAssets] = useState(true);
+  const apiOnline = !assetError;
   const allAssets = useMemo(() => flattenAssets(assets), [assets]);
   const districtAssets = useMemo(() => [...assets.districts, ...assets.pois], [assets.districts, assets.pois]);
+
+  const refreshAssets = async () => {
+    const bundle = await fetchAssetBundle();
+    setAssets({ ...emptyAssetBundle, ...bundle });
+    setAssetError(null);
+    setFiles(await listUploads().catch(() => []));
+  };
 
   useEffect(() => {
     let cancelled = false;
     fetchAssetBundle()
-      .then((bundle) => {
+      .then(async (bundle) => {
         if (!cancelled) {
           setAssets({ ...emptyAssetBundle, ...bundle });
+          setFiles(await listUploads().catch(() => []));
           setAssetError(null);
         }
       })
       .catch((error: Error) => {
         if (!cancelled) {
           setAssets(mockAssetBundle);
+          setFiles([]);
           setAssetError(`${error.message}; using bundled demo dossiers`);
         }
       })
-      .finally(() => {
-        if (!cancelled) setLoadingAssets(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+      .finally(() => { if (!cancelled) setLoadingAssets(false); });
+    return () => { cancelled = true; };
   }, []);
 
+  const archiveProps = { bundle: assets, files, query, readOnly: !apiOnline, onAssetsChanged: setAssets };
   const content = {
     dashboard: <Dashboard assets={assets} allAssets={allAssets} onSelectPage={setPage} loading={loadingAssets} error={assetError} />,
-    factions: <ArchivePage assets={assets.factions} query={query} eyebrow="GANG LEDGER" title="Factions / 帮派档案" />,
-    districts: <ArchivePage assets={districtAssets} query={query} eyebrow="CITY MAP & POI" title="Districts & POI / 区域与地点" />,
-    characters: <ArchivePage assets={assets.characters} query={query} eyebrow="MUGSHOT DOSSIERS" title="Characters / 角色卷宗" />,
-    storylines: <ArchivePage assets={assets.storylines} query={query} eyebrow="TYPEWRITER THREADS" title="Storylines / 剧本线索" />,
-    pitch: <PitchDesk assets={allAssets} />,
-    library: <LocalLibrary />,
+    factions: <ArchivePage {...archiveProps} type="factions" assets={assets.factions} eyebrow="GANG LEDGER" title="Factions / 帮派档案" />,
+    districts: <ArchivePage {...archiveProps} type="districts" assets={districtAssets} eyebrow="CITY MAP & POI" title="Districts & POI / 区域与地点" />,
+    characters: <ArchivePage {...archiveProps} type="characters" assets={assets.characters} eyebrow="MUGSHOT DOSSIERS" title="Characters / 角色卷宗" />,
+    storylines: <ArchivePage {...archiveProps} type="storylines" assets={assets.storylines} eyebrow="TYPEWRITER THREADS" title="Storylines / 剧本线索" />,
+    pitch: <PitchDesk bundle={assets} assets={allAssets} apiOnline={apiOnline} onAssetsChanged={setAssets} />,
+    library: <LocalLibrary bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} onAssetsImported={(bundle) => { setAssets(bundle); void refreshAssets().catch(() => undefined); }} />,
   }[page];
 
   return (
-    <AppShell page={page} onNavigate={setPage} query={query} onQueryChange={setQuery}>
-      {assetError && page !== 'library' ? (
-        <div className="mb-4 border border-crimson/50 bg-burgundy/45 p-3 font-mono text-sm text-paper">
-          LOCAL API OFFLINE · {assetError} · 当前使用内置 mock 演示资料；正式本地使用请运行 npm run dev:server
-        </div>
-      ) : null}
+    <AppShell page={page} onNavigate={setPage} query={query} onQueryChange={setQuery} apiOnline={apiOnline}>
+      {assetError && page !== 'library' ? <div className="mb-4 border border-crimson/50 bg-burgundy/45 p-3 font-mono text-sm text-paper">LOCAL API OFFLINE · {assetError} · Local API offline. Archive is read-only. · 当前使用内置 mock 演示资料；正式本地使用请运行 npm run dev:server</div> : null}
       {content}
     </AppShell>
   );
