@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AnyAsset } from '../../data';
+import type { DossierTemplateId } from '../templates/templateDefaults';
+import { templateById } from '../templates/templateDefaults';
+import { DuplicateWarning } from '../intake/DuplicateWarning';
+import { detectDuplicates } from '../../utils/duplicateDetection';
 import type { AssetBundle } from '../../utils/api';
 import type { AssetType } from '../../utils/assetHelpers';
 import { assetTypeLabels, normalizeAssetPayload } from '../../utils/assetHelpers';
@@ -13,7 +17,7 @@ const storylineTypes = ['main', 'side', 'character', 'district', 'faction', 'pro
 const poiTiers = ['landmark', 'safehouse', 'street', 'business', 'hideout'];
 
 const arrayFieldsByType: Record<AssetType, string[]> = {
-  factions: ['territoryDistrictIds', 'headquartersPoiIds', 'coreBusiness', 'allies', 'enemies', 'visualKeywords', 'missionTypes'],
+  factions: ['culturalRoot', 'territoryDistrictIds', 'headquartersPoiIds', 'coreBusiness', 'allies', 'enemies', 'visualKeywords', 'missionTypes'],
   districts: ['atmosphere', 'dominantFactions', 'keyPoiIds', 'storyUsage', 'gameplayUsage'],
   pois: ['gameplayUsage', 'storyUsage'],
   characters: ['playableScripts'],
@@ -21,7 +25,7 @@ const arrayFieldsByType: Record<AssetType, string[]> = {
 };
 
 const scalarFieldsByType: Record<AssetType, string[]> = {
-  factions: ['factionCategory', 'culturalRoot'],
+  factions: ['factionCategory'],
   districts: ['realWorldReference', 'districtStatus'],
   pois: ['districtId', 'poiTier', 'realWorldReference', 'addressReference'],
   characters: ['characterType', 'gender', 'age', 'nationality', 'ethnicity', 'occupation', 'factionId', 'districtId', 'weapon', 'attribute', 'characterArc', 'currentTimelineStatus'],
@@ -40,6 +44,7 @@ function optionsFor(field: string) {
   return [];
 }
 const nice = (field: string) => field.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
+const arrayValue = (value: unknown): string[] => Array.isArray(value) ? value.map(String).filter(Boolean) : String(value ?? '').split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
 const formTitleLabels: Record<AssetType, string> = {
   factions: 'Faction',
   characters: 'Character',
@@ -48,8 +53,9 @@ const formTitleLabels: Record<AssetType, string> = {
   storylines: 'Storyline',
 };
 
-export function AssetFormDrawer({ open, type, asset, bundle, onClose, onSubmit }: { open: boolean; type: AssetType; asset?: AnyAsset; bundle: AssetBundle; onClose: () => void; onSubmit: (asset: AnyAsset) => Promise<void> | void }) {
-  const initial = useMemo(() => normalizeAssetPayload(type, asset ?? {}), [asset, type]);
+export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, bundle, onClose, onSubmit, onOpenDuplicate }: { open: boolean; type: AssetType; asset?: AnyAsset; templateId?: DossierTemplateId; initialAsset?: Partial<AnyAsset>; bundle: AssetBundle; onClose: () => void; onSubmit: (asset: AnyAsset) => Promise<void> | void; onOpenDuplicate?: (asset: AnyAsset) => void }) {
+  const template = templateId ? templateById(templateId) : undefined;
+  const initial = useMemo(() => normalizeAssetPayload(type, asset ?? { ...(template?.defaults ?? {}), ...(initialAsset ?? {}) }), [asset, type, templateId, initialAsset]);
   const [draft, setDraft] = useState<Record<string, unknown>>(initial as unknown as Record<string, unknown>);
   const [saving, setSaving] = useState(false);
 
@@ -69,7 +75,12 @@ export function AssetFormDrawer({ open, type, asset, bundle, onClose, onSubmit }
     }
   };
 
-  const formTitle = `${asset ? 'Edit' : 'New'} ${formTitleLabels[type] ?? assetTypeLabels[type]} Record`;
+  const formTitle = `${asset ? 'Edit' : 'New'} ${template?.title ?? formTitleLabels[type] ?? assetTypeLabels[type]} Record`;
+  const allAssets = [...bundle.factions, ...bundle.districts, ...bundle.pois, ...bundle.characters, ...bundle.storylines] as AnyAsset[];
+  const duplicateHits = detectDuplicates(draft as Partial<AnyAsset>, allAssets, asset?.id || String(draft.id || ''));
+  const preferred = template?.preferredFields ?? [];
+  const scalarFields = [...preferred.filter((field) => scalarFieldsByType[type].includes(field)), ...scalarFieldsByType[type].filter((field) => !preferred.includes(field))];
+  const arrayFields = [...preferred.filter((field) => arrayFieldsByType[type].includes(field)), ...arrayFieldsByType[type].filter((field) => !preferred.includes(field))];
 
   const renderScalar = (field: string) => (
     <label key={field}>
@@ -98,15 +109,16 @@ export function AssetFormDrawer({ open, type, asset, bundle, onClose, onSubmit }
 
         <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
         <div className="grid gap-4 md:grid-cols-2">
+          <DuplicateWarning hits={duplicateHits} onOpen={(hit) => onOpenDuplicate?.(hit.asset)} />
           {['name', 'chineseName', 'englishName', 'category'].map(renderScalar)}
           <label className="md:col-span-2"><span className="field-label">Summary</span><textarea className="paper-input min-h-24" value={String(draft.summary ?? '')} onChange={(event) => set('summary', event.target.value)} /></label>
           <label className="md:col-span-2"><span className="field-label">Details</span><textarea className="paper-input min-h-36" value={String(draft.details ?? '')} onChange={(event) => set('details', event.target.value)} /></label>
           {renderScalar('status')}
           {renderScalar('spoilerLevel')}
-          <FieldArrayInput label="Aliases" value={(draft.aliases as string[]) ?? []} onChange={(value) => set('aliases', value)} />
-          <FieldArrayInput label="Tags" value={(draft.tags as string[]) ?? []} onChange={(value) => set('tags', value)} />
-          {scalarFieldsByType[type].map(renderScalar)}
-          {arrayFieldsByType[type].map((field) => <FieldArrayInput key={field} label={nice(field)} value={(draft[field] as string[]) ?? []} onChange={(value) => set(field, value)} />)}
+          <FieldArrayInput label="Aliases" value={arrayValue(draft.aliases)} onChange={(value) => set('aliases', value)} />
+          <FieldArrayInput label="Tags" value={arrayValue(draft.tags)} onChange={(value) => set('tags', value)} />
+          {scalarFields.map(renderScalar)}
+          {arrayFields.map((field) => <FieldArrayInput key={field} label={nice(field)} value={arrayValue(draft[field])} onChange={(value) => set(field, value)} />)}
           <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
             <RelationPicker label="Related Factions" type="factions" value={(draft.relatedFactionIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedFactionIds', value)} />
             <RelationPicker label="Related Districts" type="districts" value={(draft.relatedDistrictIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedDistrictIds', value)} />
@@ -114,9 +126,9 @@ export function AssetFormDrawer({ open, type, asset, bundle, onClose, onSubmit }
             <RelationPicker label="Related Characters" type="characters" value={(draft.relatedCharacterIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedCharacterIds', value)} />
             <RelationPicker label="Related Storylines" type="storylines" value={(draft.relatedStorylineIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedStorylineIds', value)} />
           </div>
-          <FieldArrayInput label="Narrative Constraints" value={(draft.narrativeConstraints as string[]) ?? []} onChange={(value) => set('narrativeConstraints', value)} />
-          <FieldArrayInput label="Do Not Reveal Yet" value={(draft.doNotRevealYet as string[]) ?? []} onChange={(value) => set('doNotRevealYet', value)} />
-          <FieldArrayInput label="Source Notes" value={(draft.sourceNotes as string[]) ?? []} onChange={(value) => set('sourceNotes', value)} />
+          <FieldArrayInput label="Narrative Constraints" value={arrayValue(draft.narrativeConstraints)} onChange={(value) => set('narrativeConstraints', value)} />
+          <FieldArrayInput label="Do Not Reveal Yet" value={arrayValue(draft.doNotRevealYet)} onChange={(value) => set('doNotRevealYet', value)} />
+          <FieldArrayInput label="Source Notes" value={arrayValue(draft.sourceNotes)} onChange={(value) => set('sourceNotes', value)} />
         </div>
         </div>
         <div className="shrink-0 border-t border-brass/30 bg-paper/95 p-4 shadow-[0_-12px_24px_rgba(33,19,15,0.12)]">

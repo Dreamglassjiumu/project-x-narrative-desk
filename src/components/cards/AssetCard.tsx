@@ -1,8 +1,12 @@
 import type { AnyAsset } from '../../data';
+import type { UploadedFileRecord } from '../../utils/api';
+import { getCompleteness } from '../../utils/completeness';
+import { CompletenessBadge } from '../intake/CompletenessBadge';
 import { ClassifiedBadge } from '../ui/ClassifiedBadge';
 import { StatusStamp } from '../ui/StatusStamp';
 
-export function AssetCard({ asset, active, onSelect }: { asset: AnyAsset; active?: boolean; onSelect: () => void }) {
+export function AssetCard({ asset, active, files = [], onSelect }: { asset: AnyAsset; active?: boolean; files?: UploadedFileRecord[]; onSelect: () => void }) {
+  const completeness = getCompleteness(asset, files);
   return (
     <button
       onClick={onSelect}
@@ -15,6 +19,7 @@ export function AssetCard({ asset, active, onSelect }: { asset: AnyAsset; active
           <p className="text-sm text-walnut/70">{asset.chineseName} · {asset.englishName}</p>
         </div>
         <div className="flex flex-col items-end gap-2">
+          <CompletenessBadge result={completeness} />
           <StatusStamp status={asset.status} />
           <ClassifiedBadge level={asset.spoilerLevel} />
         </div>

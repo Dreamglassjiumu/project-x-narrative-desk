@@ -50,7 +50,7 @@ export interface Character extends NarrativeAsset {
 
 export interface Faction extends NarrativeAsset {
   factionCategory: string;
-  culturalRoot: string;
+  culturalRoot: string | string[];
   territoryDistrictIds: string[];
   headquartersPoiIds: string[];
   coreBusiness: string[];

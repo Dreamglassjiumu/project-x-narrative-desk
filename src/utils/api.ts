@@ -22,6 +22,7 @@ export interface UploadedFileRecord {
   url: string;
   tags: string[];
   linkedAssetIds: string[];
+  fileUsage?: string;
 }
 
 export interface ArchiveExport extends Partial<AssetBundle> {
@@ -79,15 +80,16 @@ export const deleteAsset = (type: AssetType, id: string) =>
 
 export const listUploads = () => requestJson<UploadedFileRecord[]>('/api/uploads');
 
-export const uploadFiles = async (files: FileList | File[], metadata?: { tags?: string[]; linkedAssetIds?: string[] }) => {
+export const uploadFiles = async (files: FileList | File[], metadata?: { tags?: string[]; linkedAssetIds?: string[]; fileUsage?: string }) => {
   const formData = new FormData();
   Array.from(files).forEach((file) => formData.append('files', file));
   if (metadata?.tags) formData.append('tags', JSON.stringify(metadata.tags));
   if (metadata?.linkedAssetIds) formData.append('linkedAssetIds', JSON.stringify(metadata.linkedAssetIds));
+  if (metadata?.fileUsage) formData.append('fileUsage', metadata.fileUsage);
   return requestJson<UploadedFileRecord[]>('/api/uploads', { method: 'POST', body: formData });
 };
 
-export const updateUpload = (id: string, metadata: { tags?: string[]; linkedAssetIds?: string[] }) =>
+export const updateUpload = (id: string, metadata: { tags?: string[]; linkedAssetIds?: string[]; fileUsage?: string }) =>
   requestJson<UploadedFileRecord>(`/api/uploads/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) });
 
 export const deleteUpload = async (id: string) => requestJson<void>(`/api/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' });

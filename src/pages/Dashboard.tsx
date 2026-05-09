@@ -1,16 +1,19 @@
 import type { AnyAsset, PageKey } from '../data';
 import { AssetCard } from '../components/cards/AssetCard';
-import type { AssetBundle } from '../utils/api';
+import type { AssetBundle, UploadedFileRecord } from '../utils/api';
+import { ArchiveIntakeBoard } from '../components/intake/ArchiveIntakeBoard';
 
 export function Dashboard({
   assets,
   allAssets,
+  files,
   onSelectPage,
   loading,
   error,
 }: {
   assets: AssetBundle;
   allAssets: AnyAsset[];
+  files: UploadedFileRecord[];
   onSelectPage: (page: PageKey) => void;
   loading: boolean;
   error: string | null;
@@ -37,6 +40,7 @@ export function Dashboard({
           <button onClick={() => onSelectPage('library')} className="evidence-button bg-police/70">查看 Evidence Locker</button>
         </div>
       </section>
+      <ArchiveIntakeBoard assets={assets} files={files} onSelectPage={onSelectPage} />
       <section className="grid gap-4 md:grid-cols-4">
         {stats.map(([label, value, page]) => (
           <button key={label} onClick={() => onSelectPage(page)} className="border border-brass/30 bg-espresso/70 p-4 text-left transition hover:-translate-y-1 hover:bg-walnut/75">
@@ -48,7 +52,7 @@ export function Dashboard({
       </section>
       <section className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="grid gap-4 md:grid-cols-2">
-          {allAssets.slice(0, 4).map((asset) => <AssetCard key={asset.id} asset={asset} onSelect={() => onSelectPage(asset.category === 'Faction' ? 'factions' : asset.category === 'Character' ? 'characters' : asset.category === 'Storyline' ? 'storylines' : 'districts')} />)}
+          {allAssets.slice(0, 4).map((asset) => <AssetCard key={asset.id} asset={asset} files={files} onSelect={() => onSelectPage(asset.category === 'Faction' ? 'factions' : asset.category === 'Character' ? 'characters' : asset.category === 'Storyline' ? 'storylines' : 'districts')} />)}
           {!loading && allAssets.length === 0 ? (
             <div className="border border-dashed border-brass/40 bg-walnut/40 p-5 text-paper/70">data 目录暂未读取到资料。请确认本地 API 已启动，并检查 data/*.json。</div>
           ) : null}
