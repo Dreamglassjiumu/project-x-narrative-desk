@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react';
 import type { ArchiveExport, AssetBundle } from '../../utils/api';
-import { exportArchive, importArchive } from '../../utils/api';
+import { archiveErrorMessage, exportArchive, importArchive } from '../../utils/api';
+import type { ArchiveNotifier } from '../ui/ArchiveNotice';
 import { ConfirmDialog } from '../forms/ConfirmDialog';
 
 const keys = ['factions', 'districts', 'pois', 'characters', 'storylines', 'pitches'] as const;
 
-export function ArchiveTransferPanel({ onImported }: { onImported: (bundle: AssetBundle) => void }) {
+export function ArchiveTransferPanel({ onImported, notify }: { onImported: (bundle: AssetBundle) => void; notify: ArchiveNotifier }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<ArchiveExport | null>(null);
   const [mode, setMode] = useState<'merge' | 'replace'>('merge');
@@ -13,18 +14,21 @@ export function ArchiveTransferPanel({ onImported }: { onImported: (bundle: Asse
   const [message, setMessage] = useState<string | null>(null);
 
   const download = async () => {
+    try {
     const data = await exportArchive();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url; link.download = 'project-x-narrative-desk-export.json'; link.click(); URL.revokeObjectURL(url);
+    notify({ tone: 'success', title: 'Archive package exported.' });
+    } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') }); }
   };
   const load = async (file?: File) => {
     if (!file) return;
     const parsed = JSON.parse(await file.text()) as ArchiveExport;
     setPreview(parsed); setMessage(`Transfer manifest loaded · ${parsed.version ?? 'unknown'} · ${parsed.exportedAt ?? 'no date'}`);
   };
-  const execute = async () => { if (!preview) return; const bundle = await importArchive(preview, mode); onImported(bundle); setConfirm(false); setMessage('Archive transfer complete. Local JSON files updated.'); };
+  const execute = async () => { if (!preview) return; try { const bundle = await importArchive(preview, mode); onImported(bundle); setConfirm(false); setMessage('Archive transfer complete. Local JSON files updated.'); notify({ tone: 'success', title: 'Archive transfer complete. Local JSON files updated.' }); } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') }); } };
 
   return (
     <section className="dossier-panel p-5">

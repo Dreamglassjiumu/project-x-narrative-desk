@@ -38,6 +38,16 @@ export const emptyAssetBundle: AssetBundle = {
   pitches: [],
 };
 
+
+export function archiveErrorMessage(error: unknown, fallback = 'Write failed') {
+  const message = error instanceof Error ? error.message : String(error || fallback);
+  if (message.includes('Failed to fetch') || message.includes('NetworkError')) return 'Local API offline';
+  if (/file too large/i.test(message)) return 'File too large';
+  if (/unsupported file type/i.test(message)) return 'Unsupported file type';
+  if (/upload/i.test(fallback)) return message || 'Upload failed';
+  return message || fallback;
+}
+
 const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {
   const response = await fetch(input, init);
   if (!response.ok) {

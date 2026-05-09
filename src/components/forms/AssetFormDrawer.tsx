@@ -40,6 +40,13 @@ function optionsFor(field: string) {
   return [];
 }
 const nice = (field: string) => field.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
+const formTitleLabels: Record<AssetType, string> = {
+  factions: 'Faction',
+  characters: 'Character',
+  districts: 'District',
+  pois: 'POI',
+  storylines: 'Storyline',
+};
 
 export function AssetFormDrawer({ open, type, asset, bundle, onClose, onSubmit }: { open: boolean; type: AssetType; asset?: AnyAsset; bundle: AssetBundle; onClose: () => void; onSubmit: (asset: AnyAsset) => Promise<void> | void }) {
   const initial = useMemo(() => normalizeAssetPayload(type, asset ?? {}), [asset, type]);
@@ -55,10 +62,14 @@ export function AssetFormDrawer({ open, type, asset, bundle, onClose, onSubmit }
     try {
       await onSubmit(normalizeAssetPayload(type, draft as Partial<AnyAsset>));
       onClose();
+    } catch {
+      // The caller posts a wire notice; keep the drawer open so the typist can retry.
     } finally {
       setSaving(false);
     }
   };
+
+  const formTitle = `${asset ? 'Edit' : 'New'} ${formTitleLabels[type] ?? assetTypeLabels[type]} Record`;
 
   const renderScalar = (field: string) => (
     <label key={field}>
@@ -74,16 +85,18 @@ export function AssetFormDrawer({ open, type, asset, bundle, onClose, onSubmit }
   );
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-espresso/70 backdrop-blur-sm">
-      <aside className="h-full w-full max-w-3xl overflow-y-auto border-l-4 border-brass bg-paper p-6 shadow-noir">
-        <div className="sticky top-0 z-10 -mx-6 -mt-6 mb-5 border-b border-brass/30 bg-paper/95 p-6 backdrop-blur">
+    <div className="fixed inset-0 z-[60] flex justify-end overflow-hidden bg-espresso/70 p-3 pt-20 backdrop-blur-sm md:p-6 md:pt-24">
+      <aside className="flex h-full max-h-[calc(100vh-6rem)] w-full max-w-3xl flex-col overflow-hidden border-l-4 border-brass bg-paper shadow-noir">
+        <div className="shrink-0 border-b border-brass/30 bg-paper/95 p-5 backdrop-blur md:p-6">
           <p className="type-label text-crimson">CONFIDENTIAL DOSSIER FORM</p>
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-display text-3xl text-espresso">{asset ? 'Edit' : 'New'} {assetTypeLabels[type]} Record</h2>
+            <h2 className="font-display text-3xl text-espresso">{formTitle}</h2>
             <button className="stamp border-walnut text-walnut" onClick={onClose}>CLOSE FILE</button>
           </div>
         </div>
 
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-5 md:p-6">
         <div className="grid gap-4 md:grid-cols-2">
           {['name', 'chineseName', 'englishName', 'category'].map(renderScalar)}
           <label className="md:col-span-2"><span className="field-label">Summary</span><textarea className="paper-input min-h-24" value={String(draft.summary ?? '')} onChange={(event) => set('summary', event.target.value)} /></label>
@@ -105,9 +118,15 @@ export function AssetFormDrawer({ open, type, asset, bundle, onClose, onSubmit }
           <FieldArrayInput label="Do Not Reveal Yet" value={(draft.doNotRevealYet as string[]) ?? []} onChange={(value) => set('doNotRevealYet', value)} />
           <FieldArrayInput label="Source Notes" value={(draft.sourceNotes as string[]) ?? []} onChange={(value) => set('sourceNotes', value)} />
         </div>
-        <div className="mt-6 flex justify-end gap-3 border-t border-brass/30 pt-4">
-          <button className="stamp border-walnut text-walnut" onClick={onClose}>CANCEL</button>
-          <button className="evidence-button" disabled={saving} onClick={() => void submit()}>{saving ? 'FILING…' : 'SAVE TO LOCAL JSON'}</button>
+        </div>
+        <div className="shrink-0 border-t border-brass/30 bg-paper/95 p-4 shadow-[0_-12px_24px_rgba(33,19,15,0.12)]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="type-label text-walnut/60">LOCAL JSON FILING DESK</p>
+            <div className="flex justify-end gap-3">
+              <button className="stamp border-walnut text-walnut" disabled={saving} onClick={onClose}>CANCEL</button>
+              <button className="evidence-button disabled:cursor-wait disabled:opacity-60" disabled={saving} onClick={() => void submit()}>{saving ? 'SAVING…' : 'SAVE TO LOCAL JSON'}</button>
+            </div>
+          </div>
         </div>
       </aside>
     </div>

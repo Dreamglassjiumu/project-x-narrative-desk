@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Project X evidence stamp favicon">
+  <rect width="64" height="64" rx="10" fill="#21130f"/>
+  <path d="M12 18h16l4 6h20v28H12z" fill="#d8c09a" stroke="#9c7a38" stroke-width="3"/>
+  <path d="M16 29h32" stroke="#5c371f" stroke-width="2" opacity=".55"/>
+  <circle cx="32" cy="35" r="15" fill="none" stroke="#8b1f24" stroke-width="4" stroke-dasharray="4 3"/>
+  <path d="M22 44l20-20M42 44L22 24" stroke="#8b1f24" stroke-width="5" stroke-linecap="round"/>
+  <path d="M19 16l6-5h14l6 5" fill="none" stroke="#d8c09a" stroke-width="2" opacity=".75"/>
+</svg>

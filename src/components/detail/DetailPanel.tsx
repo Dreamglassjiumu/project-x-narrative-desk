@@ -40,8 +40,8 @@ export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, 
         <div className="flex flex-col gap-2">
           <StatusStamp status={asset.status} />
           <ClassifiedBadge level={asset.spoilerLevel} />
-          {!readOnly ? <button className="stamp border-brass text-brass" onClick={() => onEdit?.(asset)}>EDIT</button> : null}
-          {!readOnly ? <button className="stamp border-crimson text-crimson" onClick={() => onDelete?.(asset)}>DELETE</button> : null}
+          <button className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? 'Local API offline. Archive is read-only.' : undefined} onClick={() => onEdit?.(asset)}>EDIT</button>
+          <button className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? 'Local API offline. Archive is read-only.' : undefined} onClick={() => onDelete?.(asset)}>DELETE</button>
         </div>
       </div>
       <section><h3 className="section-title">Summary</h3><p className="mt-2 leading-7 text-espresso/85">{asset.summary}</p></section>
