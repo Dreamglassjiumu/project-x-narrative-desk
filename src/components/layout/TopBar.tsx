@@ -1,15 +1,16 @@
 import type { PageKey } from '../../data';
 import { SearchBox } from './SearchBox';
+import { zh } from '../../i18n/zhCN';
 
 const titleMap: Record<PageKey, string> = {
-  dashboard: 'Dashboard / 案件总览',
-  factions: 'Factions / 帮派档案',
-  districts: 'Districts & POI / 区域与地点',
-  characters: 'Characters / 角色卷宗',
-  storylines: 'Storylines / 剧本线索',
-  pitch: 'Pitch Desk / 案件提案桌',
-  library: 'Local Library / 本地证物柜',
-  intake: 'Evidence Intake / 证物接收台',
+  dashboard: '总览 / Dashboard',
+  factions: '帮派档案 / Factions',
+  districts: '区域与地点 / Districts & POI',
+  characters: '角色卷宗 / Characters',
+  storylines: '剧情线 / Storylines',
+  pitch: 'Pitch 写作台 / Pitch Desk',
+  library: '本地资料库 / Local Library',
+  intake: '证物接收台 / Evidence Intake',
 };
 
 export function TopBar({ page, query, onQueryChange, apiOnline }: { page: PageKey; query: string; onQueryChange: (value: string) => void; apiOnline: boolean }) {
@@ -23,7 +24,7 @@ export function TopBar({ page, query, onQueryChange, apiOnline }: { page: PageKe
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
           <SearchBox value={query} onChange={onQueryChange} />
           <div className="border border-teal/40 bg-police/30 px-3 py-2 font-mono text-xs text-paper/75">
-            {apiOnline ? 'LOCAL JSON SYNC READY · SYSTEM: LOCAL ONLY' : 'LOCAL API OFFLINE · READ ONLY'}
+            {apiOnline ? zh.statusLine.online : zh.statusLine.offline}
           </div>
         </div>
       </div>

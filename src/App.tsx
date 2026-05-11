@@ -49,7 +49,7 @@ export default function App() {
         if (!cancelled) {
           setAssets(mockAssetBundle);
           setFiles([]);
-          setAssetError(`${error.message}; using bundled demo dossiers`);
+          setAssetError(`${error.message}; 正在使用内置演示档案`);
         }
       })
       .finally(() => { if (!cancelled) setLoadingAssets(false); });
@@ -59,10 +59,10 @@ export default function App() {
   const archiveProps = { bundle: assets, files, query, readOnly: !apiOnline, onAssetsChanged: setAssets, onFilesChanged: setFiles, notify };
   const content = {
     dashboard: <Dashboard assets={assets} files={files} allAssets={allAssets} onSelectPage={setPage} loading={loadingAssets} error={assetError} />,
-    factions: <ArchivePage {...archiveProps} type="factions" assets={assets.factions} eyebrow="GANG LEDGER" title="Factions / 帮派档案" />,
-    districts: <ArchivePage {...archiveProps} type="districts" assets={districtAssets} eyebrow="CITY MAP & POI" title="Districts & POI / 区域与地点" />,
-    characters: <ArchivePage {...archiveProps} type="characters" assets={assets.characters} eyebrow="MUGSHOT DOSSIERS" title="Characters / 角色卷宗" />,
-    storylines: <ArchivePage {...archiveProps} type="storylines" assets={assets.storylines} eyebrow="TYPEWRITER THREADS" title="Storylines / 剧本线索" />,
+    factions: <ArchivePage {...archiveProps} type="factions" assets={assets.factions} eyebrow="GANG LEDGER" title="帮派档案 / Factions" />,
+    districts: <ArchivePage {...archiveProps} type="districts" assets={districtAssets} eyebrow="CITY MAP & POI" title="区域与地点 / Districts & POI" />,
+    characters: <ArchivePage {...archiveProps} type="characters" assets={assets.characters} eyebrow="MUGSHOT DOSSIERS" title="角色卷宗 / Characters" />,
+    storylines: <ArchivePage {...archiveProps} type="storylines" assets={assets.storylines} eyebrow="TYPEWRITER THREADS" title="剧情线 / Storylines" />,
     pitch: <PitchDesk bundle={assets} assets={allAssets} apiOnline={apiOnline} onAssetsChanged={setAssets} notify={notify} />,
     library: <LocalLibrary bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} onAssetsChanged={setAssets} notify={notify} onAssetsImported={(bundle) => { setAssets(bundle); void refreshAssets().catch(() => undefined); }} />,
     intake: <EvidenceIntake bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} onAssetsChanged={setAssets} notify={notify} />,
@@ -71,7 +71,7 @@ export default function App() {
   return (
     <AppShell page={page} onNavigate={setPage} query={query} onQueryChange={setQuery} apiOnline={apiOnline}>
       <ArchiveNoticeStack notices={notices} onDismiss={(id) => setNotices((current) => current.filter((notice) => notice.id !== id))} />
-      {assetError && page !== 'library' ? <div className="mb-4 border border-crimson/50 bg-burgundy/45 p-3 font-mono text-sm text-paper">LOCAL API OFFLINE · {assetError} · Local API offline. Archive is read-only. · 当前使用内置 mock 演示资料；正式本地使用请运行 npm run dev:server</div> : null}
+      {assetError && page !== 'library' ? <div className="mb-4 border border-crimson/50 bg-burgundy/45 p-3 font-mono text-sm text-paper">本地接口离线 · {assetError} · 本地接口离线，当前为只读模式。 · 当前使用内置 mock 演示资料；正式本地使用请运行 npm run dev:server</div> : null}
       {content}
     </AppShell>
   );

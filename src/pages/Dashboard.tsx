@@ -20,10 +20,10 @@ export function Dashboard({
 }) {
   const secretCount = allAssets.filter((asset) => asset.spoilerLevel === 'secret').length;
   const stats = [
-    ['Faction Files', assets.factions.length, 'factions'],
-    ['District / POI', assets.districts.length + assets.pois.length, 'districts'],
-    ['Character Dossiers', assets.characters.length, 'characters'],
-    ['Story Threads', assets.storylines.length, 'storylines'],
+    ['帮派档案', assets.factions.length, 'factions'],
+    ['区域 / 地点', assets.districts.length + assets.pois.length, 'districts'],
+    ['角色卷宗', assets.characters.length, 'characters'],
+    ['剧情线', assets.storylines.length, 'storylines'],
   ] as const;
 
   return (
@@ -33,18 +33,18 @@ export function Dashboard({
         <h2 className="mt-2 max-w-4xl font-display text-4xl text-ivory lg:text-6xl">Project：X Narrative Desk</h2>
         <p className="mt-4 max-w-3xl text-lg leading-8 text-paper/80">复古美国黑帮档案柜、旧警局案件墙与文案 pitch 工作台的混合系统。资料从本机 data JSON 读取，证物文件保存在本机 uploads 文件夹。</p>
         <div className="mt-4 inline-flex border border-brass/30 bg-espresso/50 px-3 py-2 font-mono text-xs text-paper/70">
-          {loading ? 'LOCAL JSON SYNC · CONNECTING' : error ? 'LOCAL JSON SYNC · OFFLINE' : 'LOCAL JSON SYNC · READY'}
+          {loading ? '本地数据同步 · 连接中' : error ? '本地数据同步 · 离线' : '本地数据同步 · 已就绪'}
         </div>
         <div className="mt-6 flex flex-wrap gap-3">
-          <button onClick={() => onSelectPage('pitch')} className="evidence-button">打开 Pitch Desk</button>
-          <button onClick={() => onSelectPage('library')} className="evidence-button bg-police/70">查看 Evidence Locker</button>
+          <button onClick={() => onSelectPage('pitch')} className="evidence-button">打开 Pitch 写作台</button>
+          <button onClick={() => onSelectPage('library')} className="evidence-button bg-police/70">查看本地资料库</button>
         </div>
       </section>
       <ArchiveIntakeBoard assets={assets} files={files} onSelectPage={onSelectPage} />
       <section className="grid gap-4 md:grid-cols-4">
         {stats.map(([label, value, page]) => (
           <button key={label} onClick={() => onSelectPage(page)} className="border border-brass/30 bg-espresso/70 p-4 text-left transition hover:-translate-y-1 hover:bg-walnut/75">
-            <p className="type-label text-crimson">ARCHIVE COUNT</p>
+            <p className="type-label text-crimson">档案数量</p>
             <p className="mt-2 font-display text-4xl text-brass">{value}</p>
             <p className="text-paper/75">{label}</p>
           </button>
@@ -58,8 +58,8 @@ export function Dashboard({
           ) : null}
         </div>
         <aside className="border border-crimson/40 bg-burgundy/45 p-5 shadow-dossier">
-          <p className="type-label text-crimson">RISK STRIP</p>
-          <h3 className="font-display text-2xl text-ivory">{secretCount} Classified Records</h3>
+          <p className="type-label text-crimson">风险提醒</p>
+          <h3 className="font-display text-2xl text-ivory">{secretCount} 机密档案</h3>
           <p className="mt-3 text-paper/70">Pitch 中出现 secret 资料时，右栏会展示 CLASSIFIED 与 doNotRevealYet 提醒，避免提前泄露。</p>
           <div className="mt-5 border border-dashed border-brass/40 p-3 font-mono text-xs text-paper/60">LOCAL-FIRST ARCHIVE · JSON FILES ON DISK</div>
         </aside>

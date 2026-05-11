@@ -1,6 +1,7 @@
 import type { AssetType } from '../../utils/assetHelpers';
 import type { DossierTemplate, DossierTemplateId } from './templateDefaults';
 import { templatesForType } from './templateDefaults';
+import { spoilerLabel, statusLabel } from '../../i18n/zhCN';
 
 const highlightedTemplateIdsForType = (type?: AssetType): DossierTemplateId[] => {
   if (type === 'factions') return ['faction'];
@@ -14,9 +15,9 @@ const highlightedTemplateIdsForType = (type?: AssetType): DossierTemplateId[] =>
 const dossierMeta = (template: DossierTemplate) => {
   const characterType = 'characterType' in template.defaults ? String(template.defaults.characterType) : undefined;
   return [
-    ['DEFAULT STATUS', template.defaults.status],
-    ['SPOILER LEVEL', template.defaults.spoilerLevel],
-    ...(characterType ? [['CHARACTER TYPE', characterType]] : []),
+    ['默认状态', template.defaults.status],
+    ['保密等级', template.defaults.spoilerLevel],
+    ...(characterType ? [['角色类型', characterType]] : []),
   ].filter(([, value]) => Boolean(value));
 };
 
@@ -32,11 +33,11 @@ export function DossierTemplatePicker({ open, type, onPick, onClose }: { open: b
         <div className="relative max-h-[calc(90vh-3rem)] overflow-y-auto pr-1">
           <div className="mb-5 flex items-start justify-between gap-3 border-b-2 border-dashed border-brass/35 pb-4">
             <div>
-              <p className="type-label text-crimson">SELECT CASE FOLDER TYPE / 选择案卷类型</p>
-              <h2 className="font-display text-4xl text-ivory">Case Folder Intake Cabinet</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">Pull a manila folder from the cabinet before the form opens. Page context is only pre-highlighted; every dossier type remains available.</p>
+              <p className="type-label text-crimson">选择档案类型 / 选择案卷类型</p>
+              <h2 className="font-display text-4xl text-ivory">档案类型选择柜</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-paper/65">请选择一种档案类型，然后进入表单。当前页面类型会默认高亮，但仍可选择其他类型。</p>
             </div>
-            <button className="stamp shrink-0 border-brass text-brass" onClick={onClose}>CLOSE CABINET</button>
+            <button className="stamp shrink-0 border-brass text-brass" onClick={onClose}>关闭</button>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -50,8 +51,8 @@ export function DossierTemplatePicker({ open, type, onPick, onClose }: { open: b
                 >
                   <div className="absolute -right-10 top-8 h-14 w-36 rotate-12 bg-brass/10" />
                   <div className="absolute right-4 top-4 -rotate-6 border-2 border-crimson px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-crimson">{template.stamp}</div>
-                  {isHighlighted ? <div className="absolute left-4 top-4 border border-brass bg-espresso px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-brass">PAGE DEFAULT</div> : null}
-                  <p className="mt-8 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-walnut/55">CASE FOLDER TYPE</p>
+                  {isHighlighted ? <div className="absolute left-4 top-4 border border-brass bg-espresso px-2 py-1 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-brass">当前页面默认</div> : null}
+                  <p className="mt-8 font-mono text-[10px] font-black uppercase tracking-[0.24em] text-walnut/55">档案类型</p>
                   <h3 className="mt-3 font-display text-3xl text-espresso">{template.englishName}</h3>
                   <p className="font-serif text-xl font-bold text-crimson">{template.chineseName}</p>
                   <p className="mt-3 min-h-12 text-sm leading-6 text-walnut/70">{template.description}</p>
@@ -59,11 +60,11 @@ export function DossierTemplatePicker({ open, type, onPick, onClose }: { open: b
                     {dossierMeta(template).map(([label, value]) => (
                       <div key={label} className="flex items-center justify-between gap-3 font-mono text-[11px] uppercase tracking-[0.14em]">
                         <span className="text-walnut/50">{label}</span>
-                        <span className="text-espresso">{value}</span>
+                        <span className="text-espresso">{label === '默认状态' ? statusLabel(String(value)) : label === '保密等级' ? spoilerLabel(String(value)) : value}</span>
                       </div>
                     ))}
                   </div>
-                  <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.18em] text-brass">Open folder →</p>
+                  <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.18em] text-brass">打开档案 →</p>
                 </button>
               );
             })}

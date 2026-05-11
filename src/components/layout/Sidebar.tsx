@@ -1,14 +1,14 @@
 import type { PageKey } from '../../data';
 
 const items: Array<{ key: PageKey; label: string; code: string }> = [
-  { key: 'dashboard', label: 'Dashboard', code: '00' },
-  { key: 'factions', label: 'Factions', code: '09' },
-  { key: 'districts', label: 'Districts & POI', code: '22' },
-  { key: 'characters', label: 'Characters', code: '47' },
-  { key: 'storylines', label: 'Storylines', code: '61' },
-  { key: 'pitch', label: 'Pitch Desk', code: 'PX' },
-  { key: 'library', label: 'Local Library', code: 'EV' },
-  { key: 'intake', label: 'Evidence Intake', code: 'IN' },
+  { key: 'dashboard', label: '总览', code: '00' },
+  { key: 'factions', label: '帮派档案', code: '09' },
+  { key: 'districts', label: '区域与地点', code: '22' },
+  { key: 'characters', label: '角色卷宗', code: '47' },
+  { key: 'storylines', label: '剧情线', code: '61' },
+  { key: 'pitch', label: 'Pitch 写作台', code: 'PX' },
+  { key: 'library', label: '本地资料库', code: 'EV' },
+  { key: 'intake', label: '证物接收台', code: 'IN' },
 ];
 
 export function Sidebar({ currentPage, onNavigate }: { currentPage: PageKey; onNavigate: (page: PageKey) => void }) {
@@ -39,7 +39,7 @@ export function Sidebar({ currentPage, onNavigate }: { currentPage: PageKey; onN
         })}
       </nav>
       <div className="mt-8 border border-dashed border-brass/30 p-3 text-xs text-paper/60">
-        CONFIDENTIAL ROUTING CABINET<br />No cloud sync. Local evidence only.
+        CONFIDENTIAL ROUTING CABINET<br />本地证物库 · 不进行云同步
       </div>
     </aside>
   );

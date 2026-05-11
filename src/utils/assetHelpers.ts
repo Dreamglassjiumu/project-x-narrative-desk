@@ -4,11 +4,11 @@ import type { AssetBundle, UploadedFileRecord } from './api';
 export type AssetType = 'factions' | 'districts' | 'pois' | 'characters' | 'storylines';
 
 export const assetTypeLabels: Record<AssetType, string> = {
-  factions: 'Faction',
-  districts: 'District',
-  pois: 'POI',
-  characters: 'Character',
-  storylines: 'Storyline',
+  factions: '帮派',
+  districts: '区域',
+  pois: '地点',
+  characters: '角色',
+  storylines: '剧情线',
 };
 
 export const assetTypeFor = (asset: AnyAsset): AssetType => {
@@ -27,14 +27,14 @@ export const makeAssetIndex = (bundle: Pick<AssetBundle, AssetType>) => {
 };
 
 export const displayAssetName = (asset?: Pick<AnyAsset, 'name' | 'chineseName' | 'englishName'>) =>
-  asset ? `${asset.name}${asset.chineseName ? ` / ${asset.chineseName}` : ''}` : 'Unknown dossier';
+  asset ? `${asset.name}${asset.chineseName ? ` / ${asset.chineseName}` : ''}` : '未知档案';
 
 const array = (value: unknown): string[] => Array.isArray(value) ? value.map(String).filter(Boolean) : [];
 
 export const normalizeAssetPayload = (type: AssetType, value: Partial<AnyAsset>): AnyAsset => {
   const base = {
     id: value.id || '',
-    name: value.name || 'Untitled Dossier',
+    name: value.name || '未命名档案',
     chineseName: value.chineseName || '',
     englishName: value.englishName || value.name || '',
     aliases: array(value.aliases),
