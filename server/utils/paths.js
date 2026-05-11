@@ -10,6 +10,8 @@ export const uploadsDir = path.join(rootDir, 'uploads');
 export const imagesDir = path.join(uploadsDir, 'images');
 export const documentsDir = path.join(uploadsDir, 'documents');
 export const uploadIndexPath = path.join(uploadsDir, '.index.json');
+export const intakeDraftsPath = path.join(dataDir, 'intake-drafts.json');
+export const backupsDir = path.join(dataDir, 'backups');
 
 export const assetFiles = {
   factions: 'factions.json',
