@@ -23,6 +23,8 @@ export interface UploadedFileRecord {
   tags: string[];
   linkedAssetIds: string[];
   fileUsage?: string;
+  note?: string;
+  caption?: string;
 }
 
 export interface ArchiveExport extends Partial<AssetBundle> {
@@ -89,7 +91,7 @@ export const uploadFiles = async (files: FileList | File[], metadata?: { tags?: 
   return requestJson<UploadedFileRecord[]>('/api/uploads', { method: 'POST', body: formData });
 };
 
-export const updateUpload = (id: string, metadata: { tags?: string[]; linkedAssetIds?: string[]; fileUsage?: string }) =>
+export const updateUpload = (id: string, metadata: { tags?: string[]; linkedAssetIds?: string[]; fileUsage?: string; note?: string; caption?: string }) =>
   requestJson<UploadedFileRecord>(`/api/uploads/${encodeURIComponent(id)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(metadata) });
 
 export const deleteUpload = async (id: string) => requestJson<void>(`/api/uploads/${encodeURIComponent(id)}`, { method: 'DELETE' });

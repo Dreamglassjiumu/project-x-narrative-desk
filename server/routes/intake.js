@@ -51,6 +51,7 @@ const normalizeAsset = (type, value = {}) => {
     doNotRevealYet: splitList(value.doNotRevealYet),
     sourceNotes: splitList(value.sourceNotes),
     linkedFiles: splitList(value.linkedFiles),
+    primaryEvidenceId: scalar(value.primaryEvidenceId),
   };
   if (type === 'characters') return { ...base, characterType: scalar(value.characterType) || 'story_npc', gender: scalar(value.gender), age: scalar(value.age), nationality: scalar(value.nationality), ethnicity: scalar(value.ethnicity), occupation: scalar(value.occupation), factionId: scalar(value.factionId), districtId: scalar(value.districtId), weapon: scalar(value.weapon), attribute: scalar(value.attribute), playableScripts: splitList(value.playableScripts), characterArc: scalar(value.characterArc), currentTimelineStatus: scalar(value.currentTimelineStatus) };
   if (type === 'factions') return { ...base, factionCategory: scalar(value.factionCategory), culturalRoot: splitList(value.culturalRoot), territoryDistrictIds: splitList(value.territoryDistrictIds), headquartersPoiIds: splitList(value.headquartersPoiIds), coreBusiness: splitList(value.coreBusiness), allies: splitList(value.allies), enemies: splitList(value.enemies), visualKeywords: splitList(value.visualKeywords), missionTypes: splitList(value.missionTypes) };
@@ -257,7 +258,9 @@ const fileDraft = async (draft, { mergeIntoId } = {}) => {
   if (!assetTypes.includes(draft.targetType)) throw new Error(`Unknown target type: ${draft.targetType}`);
   const filePath = path.join(dataDir, assetFiles[draft.targetType]);
   const records = await readJsonArray(filePath);
-  const asset = normalizeAsset(draft.targetType, draft.asset);
+  const sourceUpload = await findUpload(draft.sourceFileId);
+  const sourceIsImage = Boolean(sourceUpload && ((sourceUpload.type || '').startsWith('image/') || sourceUpload.folder === 'images'));
+  const asset = normalizeAsset(draft.targetType, { ...draft.asset, primaryEvidenceId: sourceIsImage ? (draft.asset?.primaryEvidenceId || sourceUpload.id || sourceUpload.filename) : draft.asset?.primaryEvidenceId });
   let filed;
   if (mergeIntoId) {
     const index = records.findIndex((item) => item.id === mergeIntoId);

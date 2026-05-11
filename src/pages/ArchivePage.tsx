@@ -16,7 +16,7 @@ import { getCompleteness, type CompletenessStatus } from '../utils/completeness'
 import { groupAssets, groupOptionsForType, type GroupByMode } from '../utils/grouping';
 import { getAssetHitTypes, searchAssets, type AssetFilters } from '../utils/search';
 
-export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title, readOnly, onAssetsChanged, notify }: { type: AssetType; assets: AnyAsset[]; bundle: AssetBundle; files: UploadedFileRecord[]; query: string; eyebrow: string; title: string; readOnly: boolean; onAssetsChanged: (bundle: AssetBundle) => void; notify: ArchiveNotifier }) {
+export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title, readOnly, onAssetsChanged, onFilesChanged, notify }: { type: AssetType; assets: AnyAsset[]; bundle: AssetBundle; files: UploadedFileRecord[]; query: string; eyebrow: string; title: string; readOnly: boolean; onAssetsChanged: (bundle: AssetBundle) => void; onFilesChanged: (files: UploadedFileRecord[]) => void; notify: ArchiveNotifier }) {
   const [filters, setFilters] = useState<AssetFilters>({});
   const [completenessFilter, setCompletenessFilter] = useState<CompletenessStatus | ''>('');
   const [groupBy, setGroupBy] = useState<GroupByMode>('none');
@@ -65,7 +65,7 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
           {!filtered.length ? <div className="border border-dashed border-brass/40 bg-walnut/40 p-5 text-paper/70">No dossiers match the current search and filters.</div> : null}
           {query ? <p className="font-mono text-xs text-paper/50">Search hits: {filtered.map((asset) => `${asset.name} [${getAssetHitTypes(asset, query).join(', ') || 'text'}]`).join(' · ')}</p> : null}
         </div>
-        <DetailPanel asset={selected} bundle={bundle} files={files} onOpenRelated={(asset) => setSelectedId(asset.id)} onEdit={setEditing} onDelete={setDeleting} readOnly={readOnly} />
+        <DetailPanel asset={selected} bundle={bundle} files={files} onOpenRelated={(asset) => setSelectedId(asset.id)} onEdit={setEditing} onDelete={setDeleting} readOnly={readOnly} onAssetSaved={(asset) => replaceRecord(assetTypeFor(asset), asset)} onFilesChanged={onFilesChanged} notify={notify} />
       </div>
       <DossierTemplatePicker open={Boolean(pickingType)} type={pickingType} onClose={() => setPickingType(undefined)} onPick={(templateId) => { const template = templateById(templateId); setCreating({ type: template.type, templateId }); setPickingType(undefined); }} />
       <AssetFormDrawer open={Boolean(creating)} type={creating?.type ?? type} templateId={creating?.templateId} bundle={bundle} onClose={() => setCreating(undefined)} onOpenDuplicate={openDuplicate} onSubmit={async (asset) => {
