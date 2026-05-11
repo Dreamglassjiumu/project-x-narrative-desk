@@ -121,13 +121,15 @@ export interface IntakeDraft {
   createdAt: string;
   updatedAt: string;
   filedAssetId?: string;
+  rowNumber?: number;
+  sourceRowPreview?: Record<string, string>;
 }
 export interface IntakeParseResponse {
   file: UploadedFileRecord;
   parserMode: IntakeParserMode | string;
   status: 'parsed' | 'needs_review' | 'failed';
   message?: string;
-  preview?: { kind: 'sheet'; headers: string[]; rows: string[][]; guessedMapping: Record<string, string> } | { kind: 'text'; text: string; chunks: Array<{ name: string; details: string }> } | { kind: 'json'; json: unknown };
+  preview?: { kind: 'sheet'; sheetName?: string; headers: string[]; rows: string[][]; rowCount: number; guessedMapping: Record<string, string>; mapping?: Record<string, string> } | { kind: 'text'; text: string; chunks: Array<{ name: string; details: string }> } | { kind: 'json'; json: unknown };
   drafts: IntakeDraft[];
 }
 export const parseIntakeFile = (payload: { fileId: string; parserMode?: string; targetType?: AssetType; mapping?: Record<string, string>; createDrafts?: boolean; textSplitMode?: 'full' | 'headings' | 'separator'; separator?: string; template?: string }) =>
