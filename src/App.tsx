@@ -56,7 +56,7 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  const archiveProps = { bundle: assets, files, query, readOnly: !apiOnline, onAssetsChanged: setAssets, notify };
+  const archiveProps = { bundle: assets, files, query, readOnly: !apiOnline, onAssetsChanged: setAssets, onFilesChanged: setFiles, notify };
   const content = {
     dashboard: <Dashboard assets={assets} files={files} allAssets={allAssets} onSelectPage={setPage} loading={loadingAssets} error={assetError} />,
     factions: <ArchivePage {...archiveProps} type="factions" assets={assets.factions} eyebrow="GANG LEDGER" title="Factions / 帮派档案" />,

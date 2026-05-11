@@ -19,9 +19,9 @@ export function ArchiveNoticeStack({ notices, onDismiss }: { notices: ArchiveNot
   if (!notices.length) return null;
 
   return (
-    <div className="fixed right-4 top-24 z-[70] flex w-[min(92vw,420px)] flex-col gap-3">
+    <div className="fixed right-4 top-20 z-[70] flex w-[min(88vw,360px)] flex-col gap-2 pointer-events-none">
       {notices.map((notice) => (
-        <div key={notice.id} className={`border-l-4 p-4 shadow-noir backdrop-blur ${toneClass[notice.tone]}`}>
+        <div key={notice.id} className={`pointer-events-auto border-l-4 p-3 shadow-noir backdrop-blur ${toneClass[notice.tone]}`}>
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="type-label text-brass">WIRE NOTICE // ARCHIVE STATUS</p>

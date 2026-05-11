@@ -52,6 +52,7 @@ export const normalizeAssetPayload = (type: AssetType, value: Partial<AnyAsset>)
     narrativeConstraints: array(value.narrativeConstraints),
     doNotRevealYet: array(value.doNotRevealYet),
     sourceNotes: array(value.sourceNotes),
+    primaryEvidenceId: value.primaryEvidenceId || '',
   };
 
   if (type === 'characters') return { ...base, characterType: 'story_npc', gender: '', age: '', nationality: '', ethnicity: '', occupation: '', weapon: '', attribute: '', playableScripts: [], characterArc: '', currentTimelineStatus: '', ...(value as object) } as AnyAsset;

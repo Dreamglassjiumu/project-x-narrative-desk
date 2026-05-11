@@ -1,5 +1,7 @@
 import type { AnyAsset } from '../../data';
 import type { AssetBundle, UploadedFileRecord } from '../../utils/api';
+import { flattenAssets } from '../../utils/api';
+import type { ArchiveNotifier } from '../ui/ArchiveNotice';
 import { assetTypeFor, linkedFilesForAsset, makeAssetIndex } from '../../utils/assetHelpers';
 import { getCompleteness } from '../../utils/completeness';
 import { CompletenessBadge } from '../intake/CompletenessBadge';
@@ -7,6 +9,7 @@ import { MissingFieldsList } from '../intake/MissingFieldsList';
 import { ClassifiedBadge } from '../ui/ClassifiedBadge';
 import { StatusStamp } from '../ui/StatusStamp';
 import { LinkedFileList } from './LinkedFileList';
+import { PrimaryEvidenceSlot } from '../evidence/PrimaryEvidenceSlot';
 import { RelatedAssetList } from './RelatedAssetList';
 
 const relationKeys = ['relatedFactionIds', 'relatedDistrictIds', 'relatedPoiIds', 'relatedCharacterIds', 'relatedStorylineIds'] as const;
@@ -25,7 +28,7 @@ function getExtraRows(asset: AnyAsset): Array<[string, string]> {
   return rows;
 }
 
-export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, onDelete, readOnly }: { asset?: AnyAsset; bundle: AssetBundle; files?: UploadedFileRecord[]; onOpenRelated?: (asset: AnyAsset) => void; onEdit?: (asset: AnyAsset) => void; onDelete?: (asset: AnyAsset) => void; readOnly?: boolean }) {
+export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, onDelete, readOnly, onAssetSaved, onFilesChanged, notify }: { asset?: AnyAsset; bundle: AssetBundle; files?: UploadedFileRecord[]; onOpenRelated?: (asset: AnyAsset) => void; onEdit?: (asset: AnyAsset) => void; onDelete?: (asset: AnyAsset) => void; readOnly?: boolean; onAssetSaved?: (asset: AnyAsset) => void; onFilesChanged?: (files: UploadedFileRecord[]) => void; notify?: ArchiveNotifier }) {
   if (!asset) return <aside className="dossier-panel p-6 text-paper/70">Select a case card to open the dossier folder.</aside>;
   const index = makeAssetIndex(bundle);
   const related = relationKeys.flatMap((key) => asset[key].map((id) => index.get(id))).filter(Boolean) as Array<{ asset: AnyAsset; type: ReturnType<typeof assetTypeFor> }>;
@@ -49,6 +52,7 @@ export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, 
           <button className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? 'Local API offline. Archive is read-only.' : undefined} onClick={() => onDelete?.(asset)}>DELETE</button>
         </div>
       </div>
+      <PrimaryEvidenceSlot asset={asset} bundle={bundle} files={files} readOnly={readOnly} onAssetSaved={onAssetSaved} onFilesChanged={onFilesChanged} notify={notify} />
       <section className="mb-5"><MissingFieldsList result={completeness} /></section>
       <section><h3 className="section-title">Summary</h3><p className="mt-2 leading-7 text-espresso/85">{asset.summary}</p></section>
       <section className="mt-5"><h3 className="section-title">Details</h3><p className="mt-2 whitespace-pre-wrap leading-7 text-espresso/85">{asset.details}</p></section>
@@ -58,7 +62,7 @@ export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, 
       {asset.doNotRevealYet.length ? <section className="mt-6 border border-crimson/50 bg-crimson/10 p-3"><h3 className="section-title text-crimson">Do Not Reveal Yet</h3><ul className="mt-2 list-disc pl-5 text-sm text-espresso/80">{asset.doNotRevealYet.map((item) => <li key={item}>{item}</li>)}</ul></section> : null}
       <section className="mt-6"><h3 className="section-title">Related Dossiers</h3><div className="mt-2"><RelatedAssetList related={related} onOpen={onOpenRelated} /></div></section>
       <section className="mt-6"><h3 className="section-title">Source Notes</h3><ul className="mt-2 list-disc pl-5 text-sm text-espresso/75">{asset.sourceNotes.length ? asset.sourceNotes.map((note) => <li key={note}>{note}</li>) : <li>No source notes.</li>}</ul></section>
-      <section className="mt-6"><h3 className="section-title">Linked Files / Evidence</h3><div className="mt-2"><LinkedFileList files={linked} /></div></section>
+      <section className="mt-6"><h3 className="section-title">Linked Files / Evidence</h3><div className="mt-2"><LinkedFileList files={linked} assets={flattenAssets(bundle)} /></div></section>
     </aside>
   );
 }

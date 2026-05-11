@@ -21,6 +21,7 @@ export interface NarrativeAsset {
   narrativeConstraints: string[];
   doNotRevealYet: string[];
   sourceNotes: string[];
+  primaryEvidenceId?: string;
 }
 
 export type CharacterType =

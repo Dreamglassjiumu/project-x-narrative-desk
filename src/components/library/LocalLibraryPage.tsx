@@ -11,6 +11,7 @@ import { ArchiveTransferPanel } from './ArchiveTransferPanel';
 import { BulkEvidenceActions } from './BulkEvidenceActions';
 import { EvidenceCreateDossierDialog } from './EvidenceCreateDossierDialog';
 import { EvidenceUsageBadge, fileUsageOptions } from './EvidenceUsageBadge';
+import { EvidenceLightbox } from '../evidence/EvidenceLightbox';
 
 const formatSize = (size: number) => size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(2)} MB`;
 const evidenceFolder = (file: UploadedFileRecord) => `uploads/${file.folder ?? 'documents'}`;
@@ -30,9 +31,11 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
   const [selected, setSelected] = useState<string[]>([]);
   const [usageFilter, setUsageFilter] = useState('');
   const [linkFilter, setLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
+  const [lightboxFile, setLightboxFile] = useState<UploadedFileRecord | null>(null);
   const assets = flattenAssets(bundle);
   const visibleFiles = useMemo(() => files.filter((file) => (!usageFilter || (file.fileUsage || 'other') === usageFilter) && (linkFilter === 'all' || (linkFilter === 'linked' ? (file.linkedAssetIds?.length ?? 0) > 0 : (file.linkedAssetIds?.length ?? 0) === 0))), [files, usageFilter, linkFilter]);
   const linkedNames = (file: UploadedFileRecord) => file.linkedAssetIds?.map((id) => assets.find((asset) => asset.id === id)?.name ?? id) ?? [];
+  const primaryNames = (file: UploadedFileRecord) => assets.filter((asset) => asset.primaryEvidenceId === file.id || asset.primaryEvidenceId === file.filename).map((asset) => asset.name);
   const toggleSelected = (id: string, checked: boolean) => setSelected((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id));
 
   const onFiles = async (fileList: FileList | null) => {
@@ -96,13 +99,13 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
                     <label className="mb-2 flex items-center gap-2 font-mono text-xs text-walnut/70"><input type="checkbox" checked={selected.includes(file.id)} onChange={(e) => toggleSelected(file.id, e.target.checked)} /> Select evidence</label>
                     <p className="type-label text-crimson">{categoryLabel(file)}</p>
                     {unlinked ? <p className="mt-1 inline-block border border-crimson/50 bg-crimson/10 px-2 py-1 font-mono text-xs uppercase tracking-[0.18em] text-crimson">Unfiled Evidence / 未归档证物</p> : null}
-                    <a href={file.url} target="_blank" rel="noreferrer" className="block truncate font-mono text-sm text-espresso underline decoration-walnut/30 underline-offset-4">{file.name}</a>
+                    {file.folder === 'images' ? <button onClick={() => setLightboxFile(file)} className="block truncate font-mono text-sm text-espresso underline decoration-walnut/30 underline-offset-4">{file.name}</button> : <a href={file.url} target="_blank" rel="noreferrer" className="block truncate font-mono text-sm text-espresso underline decoration-walnut/30 underline-offset-4">{file.name}</a>}
                     <p className="text-xs text-walnut/60">{file.type || 'unknown'} · {evidenceFolder(file)} · {formatSize(file.size)}</p>
                     <p className="text-xs text-walnut/60">Uploaded: {new Date(file.addedAt).toLocaleString()}</p>
                     <div className="mt-2 flex flex-wrap gap-1"><EvidenceUsageBadge usage={file.fileUsage} />{file.tags?.length ? file.tags.map((tag) => <span key={tag} className="tag-label">{tag}</span>) : <span className="tag-label opacity-60">NO TAGS</span>}</div>
-                    <p className="mt-2 text-xs text-walnut/70">Linked dossiers: {names.join(', ') || 'none'}</p>
+                    <p className="mt-2 text-xs text-walnut/70">Linked dossiers: {names.join(', ') || 'none'}</p><p className="text-xs text-walnut/70">Primary for: {primaryNames(file).join(', ') || 'none'}</p>
                   </div>
-                  <div className="flex shrink-0 flex-col gap-2">
+                  {file.folder === 'images' ? <button onClick={() => setLightboxFile(file)} className="h-24 w-24 shrink-0 border border-walnut/20 bg-paper p-1"><img src={file.url} alt={file.name} className="h-full w-full object-cover sepia" /></button> : null}<div className="flex shrink-0 flex-col gap-2">
                     <button onClick={() => setCreatingFrom(file)} disabled={busy || !apiOnline} title={!apiOnline ? 'Local API offline. Archive is read-only.' : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">CREATE DOSSIER</button>
                     <button onClick={() => setBinding(file)} disabled={busy || !apiOnline} title={!apiOnline ? 'Local API offline. Archive is read-only.' : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">BIND TO DOSSIER</button>
                     <button onClick={() => setDeleting(file)} disabled={busy || !apiOnline} title={!apiOnline ? 'Local API offline. Archive is read-only.' : undefined} className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-50">DELETE</button>
@@ -115,6 +118,7 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
       </div>
       <EvidenceCreateDossierDialog file={creatingFrom} bundle={bundle} onClose={() => setCreatingFrom(undefined)} onCreated={onCreated} onError={(message) => notify({ tone: 'error', title: message })} />
       <FileBindDialog file={binding} bundle={bundle} onClose={() => setBinding(undefined)} onSave={(metadata) => void saveBinding(metadata)} />
+      {lightboxFile ? <EvidenceLightbox image={lightboxFile} imageList={visibleFiles.filter((file) => file.folder === 'images' || file.type?.startsWith('image/'))} initialIndex={Math.max(0, visibleFiles.filter((file) => file.folder === 'images' || file.type?.startsWith('image/')).findIndex((file) => file.id === lightboxFile.id))} assets={assets} onClose={() => setLightboxFile(null)} onBind={setBinding} /> : null}
       <ConfirmDialog open={Boolean(deleting)} title="Destroy Evidence?" message={`This evidence is linked to ${deleting?.linkedAssetIds?.length ?? 0} dossiers.${(deleting?.linkedAssetIds?.length ?? 0) > 0 ? ' Linked dossiers: ' + linkedNames(deleting as UploadedFileRecord).join(', ') : ''}`} confirmLabel="DELETE EVIDENCE" onCancel={() => setDeleting(undefined)} onConfirm={() => void confirmDelete()} />
     </section>
   );

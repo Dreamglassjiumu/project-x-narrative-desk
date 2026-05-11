@@ -16,6 +16,7 @@ export function EvidenceCreateDossierDialog({ file, bundle, onClose, onCreated, 
     name: file.name.replace(/\.[^.]+$/, ''),
     sourceNotes: [`Created from local evidence: ${file.name}`],
     tags: file.tags ?? [],
+    primaryEvidenceId: file.folder === 'images' || file.type?.startsWith('image/') ? file.id : '',
   };
   return (
     <>
