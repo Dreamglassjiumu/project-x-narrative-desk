@@ -42,13 +42,15 @@ export const emptyAssetBundle: AssetBundle = {
 };
 
 
-export function archiveErrorMessage(error: unknown, fallback = 'Write failed') {
+import { translateArchiveMessage } from '../i18n/zhCN';
+
+export function archiveErrorMessage(error: unknown, fallback = '写入失败。') {
   const message = error instanceof Error ? error.message : String(error || fallback);
-  if (message.includes('Failed to fetch') || message.includes('NetworkError')) return 'Local API offline';
+  if (message.includes('Failed to fetch') || message.includes('NetworkError')) return translateArchiveMessage('Local API offline');
   if (/file too large/i.test(message)) return 'File too large';
-  if (/unsupported file type/i.test(message)) return 'Unsupported file type';
-  if (/upload/i.test(fallback)) return message || 'Upload failed';
-  return message || fallback;
+  if (/unsupported file type/i.test(message)) return translateArchiveMessage('Unsupported file type');
+  if (/upload|上传/i.test(fallback)) return translateArchiveMessage(message || 'Upload failed');
+  return translateArchiveMessage(message || fallback);
 }
 
 const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Promise<T> => {

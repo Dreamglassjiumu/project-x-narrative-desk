@@ -3,6 +3,7 @@ import type { AnyAsset } from '../../data';
 import type { DossierTemplateId } from '../templates/templateDefaults';
 import { templateById } from '../templates/templateDefaults';
 import { DuplicateWarning } from '../intake/DuplicateWarning';
+import { statusLabel, spoilerLabel } from '../../i18n/zhCN';
 import { detectDuplicates } from '../../utils/duplicateDetection';
 import type { AssetBundle } from '../../utils/api';
 import type { AssetType } from '../../utils/assetHelpers';
@@ -43,14 +44,15 @@ function optionsFor(field: string) {
   if (field === 'poiTier') return poiTiers;
   return [];
 }
-const nice = (field: string) => field.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
+const fieldLabels: Record<string, string> = { name: '名称', chineseName: '中文名', englishName: '英文名', category: '类别', status: '状态', spoilerLevel: '保密等级', characterType: '角色类型', gender: '性别', age: '年龄', nationality: '国籍', ethnicity: '族裔', occupation: '职业', factionId: '帮派 ID', districtId: '区域 ID', weapon: '武器', attribute: '属性', characterArc: '角色弧光', currentTimelineStatus: '当前时间线状态', factionCategory: '帮派类别', realWorldReference: '现实参考', districtStatus: '区域状态', poiTier: '地点等级', addressReference: '地址参考', storylineType: '剧情线类型', act: '幕', mainConflict: '主要冲突', playerGoal: '玩家目标', endingState: '结局状态', timelinePlacement: '时间线位置', pitchStatus: 'Pitch 状态', culturalRoot: '文化根源', territoryDistrictIds: '地盘区域 ID', headquartersPoiIds: '总部地点 ID', coreBusiness: '核心业务', allies: '盟友', enemies: '敌人', visualKeywords: '视觉关键词', missionTypes: '任务类型', atmosphere: '氛围', dominantFactions: '主导帮派', keyPoiIds: '关键地点 ID', storyUsage: '剧情用途', gameplayUsage: '玩法用途', playableScripts: '可玩脚本', relatedPlayableCharacters: '关联可操控角色', relatedBosses: '关联 Boss' };
+const nice = (field: string) => fieldLabels[field] || field.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
 const arrayValue = (value: unknown): string[] => Array.isArray(value) ? value.map(String).filter(Boolean) : String(value ?? '').split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
 const formTitleLabels: Record<AssetType, string> = {
-  factions: 'Faction',
-  characters: 'Character',
-  districts: 'District',
-  pois: 'POI',
-  storylines: 'Storyline',
+  factions: '帮派',
+  characters: '角色',
+  districts: '区域',
+  pois: '地点',
+  storylines: '剧情线',
 };
 
 export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, bundle, onClose, onSubmit, onOpenDuplicate }: { open: boolean; type: AssetType; asset?: AnyAsset; templateId?: DossierTemplateId; initialAsset?: Partial<AnyAsset>; bundle: AssetBundle; onClose: () => void; onSubmit: (asset: AnyAsset) => Promise<void> | void; onOpenDuplicate?: (asset: AnyAsset) => void }) {
@@ -87,10 +89,10 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
       <span className="field-label">{nice(field)}</span>
       {isSelectField(field) ? (
         <select className="paper-input" value={String(draft[field] ?? '')} onChange={(event) => set(field, event.target.value)}>
-          {optionsFor(field).map((option) => <option key={option} value={option}>{option}</option>)}
+          {optionsFor(field).map((option) => <option key={option} value={option}>{field === 'status' ? statusLabel(option) : field === 'spoilerLevel' ? spoilerLabel(option) : option}</option>)}
         </select>
       ) : (
-        <input className="paper-input" value={String(draft[field] ?? '')} onChange={(event) => set(field, event.target.value)} placeholder="Typewriter entry" />
+        <input className="paper-input" value={String(draft[field] ?? '')} onChange={(event) => set(field, event.target.value)} placeholder="请输入内容" />
       )}
     </label>
   );
@@ -102,7 +104,7 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
           <p className="type-label text-crimson">CONFIDENTIAL DOSSIER FORM</p>
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display text-3xl text-espresso">{formTitle}</h2>
-            <button className="stamp border-walnut text-walnut" onClick={onClose}>CLOSE FILE</button>
+            <button className="stamp border-walnut text-walnut" onClick={onClose}>关闭档案</button>
           </div>
         </div>
 
@@ -111,32 +113,32 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
         <div className="grid gap-4 md:grid-cols-2">
           <DuplicateWarning hits={duplicateHits} onOpen={(hit) => onOpenDuplicate?.(hit.asset)} />
           {['name', 'chineseName', 'englishName', 'category'].map(renderScalar)}
-          <label className="md:col-span-2"><span className="field-label">Summary</span><textarea className="paper-input min-h-24" value={String(draft.summary ?? '')} onChange={(event) => set('summary', event.target.value)} /></label>
-          <label className="md:col-span-2"><span className="field-label">Details</span><textarea className="paper-input min-h-36" value={String(draft.details ?? '')} onChange={(event) => set('details', event.target.value)} /></label>
+          <label className="md:col-span-2"><span className="field-label">摘要</span><textarea className="paper-input min-h-24" value={String(draft.summary ?? '')} onChange={(event) => set('summary', event.target.value)} /></label>
+          <label className="md:col-span-2"><span className="field-label">详细说明</span><textarea className="paper-input min-h-36" value={String(draft.details ?? '')} onChange={(event) => set('details', event.target.value)} /></label>
           {renderScalar('status')}
           {renderScalar('spoilerLevel')}
-          <FieldArrayInput label="Aliases" value={arrayValue(draft.aliases)} onChange={(value) => set('aliases', value)} />
-          <FieldArrayInput label="Tags" value={arrayValue(draft.tags)} onChange={(value) => set('tags', value)} />
+          <FieldArrayInput label="别名" value={arrayValue(draft.aliases)} onChange={(value) => set('aliases', value)} />
+          <FieldArrayInput label="标签" value={arrayValue(draft.tags)} onChange={(value) => set('tags', value)} />
           {scalarFields.map(renderScalar)}
           {arrayFields.map((field) => <FieldArrayInput key={field} label={nice(field)} value={arrayValue(draft[field])} onChange={(value) => set(field, value)} />)}
           <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
-            <RelationPicker label="Related Factions" type="factions" value={(draft.relatedFactionIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedFactionIds', value)} />
-            <RelationPicker label="Related Districts" type="districts" value={(draft.relatedDistrictIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedDistrictIds', value)} />
-            <RelationPicker label="Related POI" type="pois" value={(draft.relatedPoiIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedPoiIds', value)} />
-            <RelationPicker label="Related Characters" type="characters" value={(draft.relatedCharacterIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedCharacterIds', value)} />
-            <RelationPicker label="Related Storylines" type="storylines" value={(draft.relatedStorylineIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedStorylineIds', value)} />
+            <RelationPicker label="关联帮派" type="factions" value={(draft.relatedFactionIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedFactionIds', value)} />
+            <RelationPicker label="关联区域" type="districts" value={(draft.relatedDistrictIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedDistrictIds', value)} />
+            <RelationPicker label="关联地点" type="pois" value={(draft.relatedPoiIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedPoiIds', value)} />
+            <RelationPicker label="关联角色" type="characters" value={(draft.relatedCharacterIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedCharacterIds', value)} />
+            <RelationPicker label="关联剧情线" type="storylines" value={(draft.relatedStorylineIds as string[]) ?? []} bundle={bundle} onChange={(value) => set('relatedStorylineIds', value)} />
           </div>
-          <FieldArrayInput label="Narrative Constraints" value={arrayValue(draft.narrativeConstraints)} onChange={(value) => set('narrativeConstraints', value)} />
-          <FieldArrayInput label="Do Not Reveal Yet" value={arrayValue(draft.doNotRevealYet)} onChange={(value) => set('doNotRevealYet', value)} />
-          <FieldArrayInput label="Source Notes" value={arrayValue(draft.sourceNotes)} onChange={(value) => set('sourceNotes', value)} />
+          <FieldArrayInput label="叙事限制" value={arrayValue(draft.narrativeConstraints)} onChange={(value) => set('narrativeConstraints', value)} />
+          <FieldArrayInput label="暂不公开" value={arrayValue(draft.doNotRevealYet)} onChange={(value) => set('doNotRevealYet', value)} />
+          <FieldArrayInput label="来源备注" value={arrayValue(draft.sourceNotes)} onChange={(value) => set('sourceNotes', value)} />
         </div>
         </div>
         <div className="shrink-0 border-t border-brass/30 bg-paper/95 p-4 shadow-[0_-12px_24px_rgba(33,19,15,0.12)]">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="type-label text-walnut/60">LOCAL JSON FILING DESK</p>
             <div className="flex justify-end gap-3">
-              <button className="stamp border-walnut text-walnut" disabled={saving} onClick={onClose}>CANCEL</button>
-              <button className="evidence-button disabled:cursor-wait disabled:opacity-60" disabled={saving} onClick={() => void submit()}>{saving ? 'SAVING…' : 'SAVE TO LOCAL JSON'}</button>
+              <button className="stamp border-walnut text-walnut" disabled={saving} onClick={onClose}>取消</button>
+              <button className="evidence-button disabled:cursor-wait disabled:opacity-60" disabled={saving} onClick={() => void submit()}>{saving ? '正在保存…' : '保存档案'}</button>
             </div>
           </div>
         </div>

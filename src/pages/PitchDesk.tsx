@@ -54,7 +54,7 @@ function ArchiveSearchCard({ asset, onOpen, onAdd }: { asset: AnyAsset; onOpen: 
       </div>
       <p className="mt-3 text-sm leading-6 text-espresso/80">{asset.summary}</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button className="stamp border-walnut text-walnut" onClick={onOpen}>Open Dossier</button>
+        <button className="stamp border-walnut text-walnut" onClick={onOpen}>打开档案</button>
         <button className="stamp border-brass bg-brass/10 text-walnut" onClick={onAdd}>Add to Pitch Links</button>
       </div>
     </article>
@@ -117,13 +117,13 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
       setSaveStatus('saved');
       const exists = bundle.pitches.some((pitch) => pitch.id === saved.id);
       onAssetsChanged({ ...bundle, pitches: exists ? bundle.pitches.map((pitch) => pitch.id === saved.id ? saved : pitch) : [saved, ...bundle.pitches] });
-      notify({ tone: 'success', title: 'Pitch saved into local archive.' });
+      notify({ tone: 'success', title: 'Pitch 已保存到本地档案。' });
     } catch (error) {
-      notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') });
+      notify({ tone: 'error', title: archiveErrorMessage(error, '写入失败。') });
     }
   };
 
-  const duplicate = () => void save({ ...draft, id: undefined, title: `${draft.title || 'Untitled Case Pitch'} Copy`, status: 'draft', createdAt: undefined, updatedAt: undefined }, true);
+  const duplicate = () => void save({ ...draft, id: undefined, title: `${draft.title || '未命名 Pitch'} Copy`, status: 'draft', createdAt: undefined, updatedAt: undefined }, true);
 
   const remove = async () => {
     if (!draft.id || !apiOnline) return;
@@ -134,9 +134,9 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
       savedSnapshot.current = JSON.stringify(defaultPitchDraft);
       setSaveStatus('autosaved');
       setConfirmDelete(false);
-      notify({ tone: 'success', title: 'Pitch removed from local archive.' });
+      notify({ tone: 'success', title: 'Pitch 已从本地档案删除。' });
     } catch (error) {
-      notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') });
+      notify({ tone: 'error', title: archiveErrorMessage(error, '写入失败。') });
     }
   };
 
@@ -145,7 +145,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
     const linkedAndDetected = uniqueAssets([...manualLinks, ...detected]);
     try {
       const storyline = await createAsset<Storyline>('storylines', {
-        name: draft.title || 'Untitled Storyline Draft',
+        name: draft.title || '未命名剧情线草稿',
         chineseName: draft.title || '',
         englishName: draft.title || '',
         category: 'Storyline',
@@ -162,7 +162,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
         relatedStorylineIds: draft.linkedStorylineIds,
         narrativeConstraints: [],
         doNotRevealYet: [],
-        sourceNotes: [`Converted from pitch ${draft.id ?? draft.title}`],
+        sourceNotes: [`从 Pitch 转换 ${draft.id ?? draft.title}`],
         storylineType: draft.type === 'main' ? 'main' : draft.type === 'side' ? 'side' : draft.type === 'other' ? 'side' : draft.type,
         act: '',
         mainConflict: '',
@@ -172,9 +172,9 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
         pitchStatus: 'under_review',
       });
       onAssetsChanged({ ...bundle, storylines: [storyline, ...bundle.storylines] });
-      notify({ tone: 'success', title: 'Storyline draft filed into local archive.' });
+      notify({ tone: 'success', title: '剧情线草稿已保存到本地档案。' });
     } catch (error) {
-      notify({ tone: 'error', title: archiveErrorMessage(error, 'Write failed') });
+      notify({ tone: 'error', title: archiveErrorMessage(error, '写入失败。') });
     }
   };
 
@@ -196,7 +196,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
         </div>
         {selectedAsset ? (
           <div className="mt-4 border border-brass/35 bg-espresso/75 p-3 text-paper shadow-card">
-            <p className="type-label text-brass">OPEN DOSSIER</p>
+            <p className="type-label text-brass">打开档案</p>
             <h3 className="mt-2 font-display text-xl text-ivory">{selectedAsset.name}</h3>
             <p className="mt-2 text-sm leading-6 text-paper/75">{selectedAsset.details || selectedAsset.summary}</p>
           </div>
@@ -204,7 +204,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
       </aside>
 
       <main className="min-w-0 space-y-4">
-        {!apiOnline ? <p className="border border-crimson/40 bg-burgundy/45 p-2 font-mono text-xs text-paper">Local API offline. Archive is read-only.</p> : null}
+        {!apiOnline ? <p className="border border-crimson/40 bg-burgundy/45 p-2 font-mono text-xs text-paper">本地接口离线，当前为只读模式。</p> : null}
         <div className="dossier-panel p-4">
           <PitchLoader pitches={savedPitches} currentId={draft.id} onLoad={loadPitch} />
           <div className="mt-4"><PitchActions disabled={!apiOnline} onSave={() => void save()} onDuplicate={duplicate} onDelete={() => setConfirmDelete(true)} onConvert={() => void convert()} onClear={clearDraft} /></div>
@@ -213,7 +213,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
       </main>
 
       <PitchInsightPanel draft={draft} manualLinks={manualLinks} detected={detected} riskAssets={riskAssets} saveStatus={saveStatus} />
-      <ConfirmDialog open={confirmDelete} title="Delete Pitch?" message="This case proposal will be removed from data/pitches.json." confirmLabel="DELETE PITCH" onCancel={() => setConfirmDelete(false)} onConfirm={() => void remove()} />
+      <ConfirmDialog open={confirmDelete} title="删除 Pitch？" message="此 Pitch 将从 data/pitches.json 中删除。" confirmLabel="删除 Pitch" onCancel={() => setConfirmDelete(false)} onConfirm={() => void remove()} />
     </div>
   );
 }

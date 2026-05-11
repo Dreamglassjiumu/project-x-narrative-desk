@@ -10,16 +10,16 @@ const AssetPillList = ({ title, assets }: { title: string; assets: AnyAsset[] })
   <div>
     <p className="field-label text-paper/55">{title}</p>
     <div className="mt-2 flex flex-wrap gap-2">
-      {assets.length ? assets.map((asset) => <span key={asset.id} className="tag-label border-brass/40 bg-paper/10 text-paper/80">{asset.name}</span>) : <span className="text-sm text-paper/45">None linked.</span>}
+      {assets.length ? assets.map((asset) => <span key={asset.id} className="tag-label border-brass/40 bg-paper/10 text-paper/80">{asset.name}</span>) : <span className="text-sm text-paper/45">暂无关联。</span>}
     </div>
   </div>
 );
 
 const statusCopy: Record<SaveStatus, string> = {
-  autosaved: 'Autosaved to browser draft',
-  unsaved: 'Unsaved changes',
-  saved: 'Saved to local archive',
-  offline: 'Local API offline / read-only',
+  autosaved: '已自动保存到浏览器草稿',
+  unsaved: '有未保存修改',
+  saved: '已保存到本地档案',
+  offline: '本地接口离线 / 只读',
 };
 
 export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, saveStatus }: { draft: PitchDraft; manualLinks: AnyAsset[]; detected: AnyAsset[]; riskAssets: AnyAsset[]; saveStatus: SaveStatus }) {
@@ -30,18 +30,18 @@ export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, sa
       <p className="mt-2 text-sm text-paper/65">扫描 Pitch Title + Pitch Body，并汇总手动关联资料中的限制。</p>
 
       <section className="mt-4 border border-brass/25 bg-walnut/35 p-3">
-        <p className="type-label text-brass">Save Status</p>
+        <p className="type-label text-brass">保存状态</p>
         <p className={`mt-2 font-mono text-sm ${saveStatus === 'offline' ? 'text-crimson' : saveStatus === 'saved' ? 'text-teal' : 'text-paper'}`}>{statusCopy[saveStatus]}</p>
-        <p className="mt-1 text-xs text-paper/45">Draft ID: {draft.id ?? 'not filed yet'}</p>
+        <p className="mt-1 text-xs text-paper/45">草稿 ID： {draft.id ?? '尚未入库'}</p>
       </section>
 
       <section className="mt-4 space-y-3 border border-brass/25 bg-black/10 p-3">
         <p className="type-label text-brass">Manual Links / 手动关联</p>
-        <AssetPillList title="Characters" assets={groupByCategory(manualLinks, 'Character')} />
-        <AssetPillList title="Factions" assets={groupByCategory(manualLinks, 'Faction')} />
-        <AssetPillList title="Districts" assets={groupByCategory(manualLinks, 'District')} />
-        <AssetPillList title="POIs" assets={groupByCategory(manualLinks, 'POI')} />
-        <AssetPillList title="Storylines" assets={groupByCategory(manualLinks, 'Storyline')} />
+        <AssetPillList title="角色" assets={groupByCategory(manualLinks, 'Character')} />
+        <AssetPillList title="帮派" assets={groupByCategory(manualLinks, 'Faction')} />
+        <AssetPillList title="区域" assets={groupByCategory(manualLinks, 'District')} />
+        <AssetPillList title="地点" assets={groupByCategory(manualLinks, 'POI')} />
+        <AssetPillList title="剧情线" assets={groupByCategory(manualLinks, 'Storyline')} />
       </section>
 
       <section className="mt-4">
@@ -64,14 +64,14 @@ export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, sa
       </section>
 
       <section className="mt-4 border border-crimson/35 bg-crimson/10 p-3">
-        <p className="type-label text-crimson">Risk Strip / 风险提醒</p>
+        <p className="type-label text-crimson">风险提醒</p>
         <div className="mt-3 space-y-3">
-          {riskAssets.every((asset) => asset.narrativeConstraints.length === 0 && asset.doNotRevealYet.length === 0) ? <p className="text-sm text-paper/60">No narrativeConstraints or doNotRevealYet found in linked/detected dossiers.</p> : null}
+          {riskAssets.every((asset) => asset.narrativeConstraints.length === 0 && asset.doNotRevealYet.length === 0) ? <p className="text-sm text-paper/60">关联或识别到的档案中没有叙事限制或暂不公开内容。</p> : null}
           {riskAssets.map((asset) => (asset.narrativeConstraints.length || asset.doNotRevealYet.length) ? (
             <article key={asset.id} className="border-l-4 border-brass bg-paper/95 p-3 text-espresso">
               <p className="font-display text-lg">{asset.name}</p>
-              {asset.narrativeConstraints.length > 0 && <ul className="mt-2 space-y-1 text-sm">{asset.narrativeConstraints.map((item) => <li key={item}>Constraint: {item}</li>)}</ul>}
-              {asset.doNotRevealYet.length > 0 && <p className="mt-2 bg-crimson/10 p-2 text-sm text-crimson">Do Not Reveal Yet: {asset.doNotRevealYet.join(' / ')}</p>}
+              {asset.narrativeConstraints.length > 0 && <ul className="mt-2 space-y-1 text-sm">{asset.narrativeConstraints.map((item) => <li key={item}>限制： {item}</li>)}</ul>}
+              {asset.doNotRevealYet.length > 0 && <p className="mt-2 bg-crimson/10 p-2 text-sm text-crimson">暂不公开： {asset.doNotRevealYet.join(' / ')}</p>}
             </article>
           ) : null)}
         </div>

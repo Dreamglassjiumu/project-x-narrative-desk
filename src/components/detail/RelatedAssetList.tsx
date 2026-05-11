@@ -2,7 +2,7 @@ import type { AnyAsset } from '../../data';
 import { assetTypeLabels, displayAssetName } from '../../utils/assetHelpers';
 
 export function RelatedAssetList({ related, onOpen }: { related: Array<{ asset: AnyAsset; type: keyof typeof assetTypeLabels }>; onOpen?: (asset: AnyAsset) => void }) {
-  if (!related.length) return <p className="text-sm text-walnut/60">No linked records.</p>;
+  if (!related.length) return <p className="text-sm text-walnut/60">暂无关联档案。</p>;
   return (
     <div className="flex flex-wrap gap-2">
       {related.map(({ asset, type }) => (

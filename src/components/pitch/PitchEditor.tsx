@@ -47,7 +47,7 @@ function LinkedDossierGroup({ group, selectedIds, pickerOpen, query, onOpenPicke
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="type-label text-[10px] text-crimson">{group.title}</p>
-          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-walnut/60">{selectedIds.length} filed</p>
+          <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-walnut/60">{selectedIds.length} 已关联</p>
         </div>
         <button type="button" className="stamp border-brass bg-brass/10 text-walnut shadow-card transition hover:-translate-y-0.5 hover:bg-brass/20" onClick={onOpenPicker}>
           + {group.addLabel}
@@ -59,7 +59,7 @@ function LinkedDossierGroup({ group, selectedIds, pickerOpen, query, onOpenPicke
           const asset = assetsById.get(id);
           return (
             <span key={id} className="inline-flex max-w-full rotate-[-0.4deg] items-center gap-2 border border-walnut/35 bg-paper/90 px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.12em] text-espresso shadow-card">
-              <span className="truncate">{asset ? assetDisplayName(asset) : `Missing dossier ${id}`}</span>
+              <span className="truncate">{asset ? assetDisplayName(asset) : `缺失档案 ${id}`}</span>
               <button type="button" className="text-crimson transition hover:scale-125" aria-label={`Remove ${asset ? assetDisplayName(asset) : id}`} onClick={() => onRemove(id)}>×</button>
             </span>
           );
@@ -73,13 +73,13 @@ function LinkedDossierGroup({ group, selectedIds, pickerOpen, query, onOpenPicke
               <p className="type-label text-brass">ARCHIVE PICKER / 档案选择器</p>
               <h4 className="font-display text-xl text-ivory">{group.addLabel}</h4>
             </div>
-            <button type="button" className="stamp border-paper/40 text-paper/75" onClick={onClosePicker}>CLOSE</button>
+            <button type="button" className="stamp border-paper/40 text-paper/75" onClick={onClosePicker}>关闭</button>
           </div>
           <input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
             className="mt-3 w-full border border-brass/40 bg-[#1c120f] px-3 py-2 font-mono text-sm text-paper outline-none placeholder:text-paper/35 focus:border-crimson focus:ring-2 focus:ring-crimson/30"
-            placeholder="Search name / chineseName / englishName / aliases"
+            placeholder="搜索名称、中文名、英文名或别名"
             autoFocus
           />
           <div className="mt-3 max-h-64 space-y-2 overflow-y-auto pr-1">
@@ -97,13 +97,13 @@ function LinkedDossierGroup({ group, selectedIds, pickerOpen, query, onOpenPicke
                       <p className="truncate font-display text-lg text-ivory">{assetDisplayName(asset)}</p>
                       <p className="truncate font-mono text-[11px] uppercase tracking-[0.14em] text-brass/75">{asset.chineseName} · {asset.englishName}</p>
                     </div>
-                    <span className={`stamp shrink-0 ${selected ? 'border-teal text-teal' : 'border-brass text-brass'}`}>{selected ? 'SELECTED' : 'ADD'}</span>
+                    <span className={`stamp shrink-0 ${selected ? 'border-teal text-teal' : 'border-brass text-brass'}`}>{selected ? '已选择' : 'ADD'}</span>
                   </div>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-paper/65">{asset.aliases.length ? `Aliases: ${asset.aliases.join(', ')}` : asset.summary}</p>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-paper/65">{asset.aliases.length ? `别名： ${asset.aliases.join(', ')}` : asset.summary}</p>
                 </button>
               );
             })}
-            {filteredAssets.length === 0 ? <p className="border border-dashed border-brass/30 p-3 text-sm text-paper/55">No dossiers match this search.</p> : null}
+            {filteredAssets.length === 0 ? <p className="border border-dashed border-brass/30 p-3 text-sm text-paper/55">没有匹配的档案。</p> : null}
           </div>
         </div>
       ) : null}
@@ -137,12 +137,12 @@ function LinkedDossiersPanel({ groups, draft, onUpdateLinks }: { groups: Dossier
     <section className="mt-4 border border-brass/35 bg-walnut/10 p-3 shadow-card">
       <button type="button" className="flex w-full flex-wrap items-center justify-between gap-3 text-left" onClick={() => setExpanded((current) => !current)}>
         <div>
-          <p className="type-label text-crimson">LINKED DOSSIERS / 关联档案</p>
+          <p className="type-label text-crimson">关联档案</p>
           <p className="mt-1 font-mono text-xs uppercase tracking-[0.16em] text-walnut/65">{summary}</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="stamp border-brass bg-brass/10 text-walnut">{totalLinked} linked</span>
-          <span className="stamp border-walnut/50 text-walnut">{expanded ? 'COLLAPSE' : 'EXPAND'}</span>
+          <span className="stamp border-brass bg-brass/10 text-walnut">{totalLinked} 已关联</span>
+          <span className="stamp border-walnut/50 text-walnut">{expanded ? '收起' : '展开'}</span>
         </div>
       </button>
 
@@ -173,11 +173,11 @@ export function PitchEditor({ draft, assets, onChange }: { draft: PitchDraft; as
   const updateLinks = (key: LinkKey, value: string[]) => update(key, value as PitchDraft[typeof key]);
 
   const dossierGroups: DossierGroup[] = useMemo(() => [
-    { key: 'linkedCharacterIds', title: 'Characters', summaryLabel: 'Characters', addLabel: 'Add Character', emptyLabel: 'No character dossiers linked.', assets: assets.characters },
-    { key: 'linkedFactionIds', title: 'Factions', summaryLabel: 'Factions', addLabel: 'Add Faction', emptyLabel: 'No faction dossiers linked.', assets: assets.factions },
-    { key: 'linkedDistrictIds', title: 'Districts', summaryLabel: 'Districts', addLabel: 'Add District', emptyLabel: 'No district dossiers linked.', assets: assets.districts },
-    { key: 'linkedPoiIds', title: 'POIs', summaryLabel: 'POIs', addLabel: 'Add POI', emptyLabel: 'No POI dossiers linked.', assets: assets.pois },
-    { key: 'linkedStorylineIds', title: 'Storylines', summaryLabel: 'Storylines', addLabel: 'Add Storyline', emptyLabel: 'No storyline dossiers linked.', assets: assets.storylines },
+    { key: 'linkedCharacterIds', title: '关联角色', summaryLabel: '角色', addLabel: '添加角色', emptyLabel: '暂无关联角色。', assets: assets.characters },
+    { key: 'linkedFactionIds', title: '关联帮派', summaryLabel: '帮派', addLabel: '添加帮派', emptyLabel: '暂无关联帮派。', assets: assets.factions },
+    { key: 'linkedDistrictIds', title: '关联区域', summaryLabel: '区域', addLabel: '添加区域', emptyLabel: '暂无关联区域。', assets: assets.districts },
+    { key: 'linkedPoiIds', title: '关联地点', summaryLabel: '地点', addLabel: '添加地点', emptyLabel: '暂无关联地点。', assets: assets.pois },
+    { key: 'linkedStorylineIds', title: '关联剧情线', summaryLabel: '剧情线', addLabel: '添加剧情线', emptyLabel: '暂无关联剧情线。', assets: assets.storylines },
   ], [assets]);
 
   const downloadMarkdown = () => {
@@ -205,24 +205,24 @@ export function PitchEditor({ draft, assets, onChange }: { draft: PitchDraft; as
           <p className="mt-1 text-sm text-walnut/70">少量元信息 + 一份长正文。背景、目标、冲突、流程都直接写进正文。</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={insertOutline} className="stamp border-walnut text-walnut">Insert Pitch Outline</button>
-          <button onClick={downloadMarkdown} className="evidence-button">Export Markdown</button>
+          <button onClick={insertOutline} className="stamp border-walnut text-walnut">插入 Pitch 提纲</button>
+          <button onClick={downloadMarkdown} className="evidence-button">导出 Markdown</button>
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_180px_180px]">
         <label className="block xl:col-span-1">
-          <span className="field-label">Pitch Title / 标题</span>
-          <input value={draft.title} onChange={(event) => update('title', event.target.value)} className="paper-input text-lg font-semibold" placeholder="CASE TITLE" />
+          <span className="field-label">Pitch 标题</span>
+          <input value={draft.title} onChange={(event) => update('title', event.target.value)} className="paper-input text-lg font-semibold" placeholder="请输入 Pitch 标题" />
         </label>
         <label className="block">
-          <span className="field-label">Pitch Type / 类型</span>
+          <span className="field-label">Pitch 类型</span>
           <select value={draft.type} onChange={(event) => update('type', event.target.value as PitchDraft['type'])} className="paper-input">
             {pitchTypes.map((type) => <option key={type}>{type}</option>)}
           </select>
         </label>
         <label className="block">
-          <span className="field-label">Pitch Status / 状态</span>
+          <span className="field-label">Pitch 状态</span>
           <select value={draft.status} onChange={(event) => update('status', event.target.value as PitchDraft['status'])} className="paper-input">
             {pitchStatuses.map((status) => <option key={status}>{status}</option>)}
           </select>
@@ -232,12 +232,12 @@ export function PitchEditor({ draft, assets, onChange }: { draft: PitchDraft; as
       <LinkedDossiersPanel groups={dossierGroups} draft={draft} onUpdateLinks={updateLinks} />
 
       <label className="mt-5 block">
-        <span className="field-label">Pitch Body / Pitch 正文</span>
+        <span className="field-label">Pitch 正文</span>
         <textarea
           value={draft.body}
           onChange={(event) => update('body', event.target.value)}
           className="paper-input min-h-[620px] resize-y font-mono text-base leading-7 shadow-inner"
-          placeholder="Type the case proposal here... / 在这里写主线、支线 pitch 正文……"
+          placeholder="在这里写主线、支线 Pitch 正文……"
         />
       </label>
     </section>

@@ -1,10 +1,10 @@
 import type { AssetStatus } from '../../data';
 
 const statusLabel: Record<AssetStatus, string> = {
-  canon: 'CANON',
-  draft: 'DRAFT',
-  deprecated: 'DEPRECATED',
-  under_review: 'UNDER REVIEW',
+  canon: '正式设定',
+  draft: '草稿',
+  deprecated: '已废弃',
+  under_review: '审核中',
 };
 
 export function StatusStamp({ status }: { status: AssetStatus }) {

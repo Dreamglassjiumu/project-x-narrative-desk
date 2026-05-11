@@ -17,13 +17,13 @@ export function TagChipInput({ label, value, onChange, placeholder }: { label: s
           {value.map((item) => (
             <span key={item} className="tag-label inline-flex items-center gap-2">
               {item}
-              <button type="button" className="font-mono text-crimson" aria-label={`Remove ${item}`} onClick={() => remove(item)}>×</button>
+              <button type="button" className="font-mono text-crimson" aria-label={`移除 ${item}`} onClick={() => remove(item)}>×</button>
             </span>
           ))}
           <input
             className="min-w-36 flex-1 bg-transparent font-mono text-sm outline-none placeholder:text-walnut/45"
             value={entry}
-            placeholder={placeholder ?? 'Type and press Enter'}
+            placeholder={placeholder ?? '输入后按 Enter'}
             onChange={(event) => setEntry(event.target.value)}
             onBlur={() => add()}
             onKeyDown={(event) => {
