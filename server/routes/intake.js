@@ -1,24 +1,24 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { Router } from 'express';
-import { assetFiles, dataDir, uploadFolders, uploadIndexPath } from '../utils/paths.js';
-import { readJsonArray, writeJsonArray } from '../utils/jsonStore.js';
+import { assetFiles, backupsDir, dataDir, intakeDraftsPath, uploadFolders, uploadIndexPath } from '../utils/paths.js';
+import { ensureJsonArrayFile, readJsonArray, writeJsonArray } from '../utils/jsonStore.js';
 
 const router = Router();
-const draftsPath = path.join(dataDir, 'intake-drafts.json');
-const backupsDir = path.join(dataDir, 'backups');
+const draftsPath = intakeDraftsPath;
 const assetTypes = ['factions', 'districts', 'pois', 'characters', 'storylines'];
 const idPrefixes = { factions: 'faction', districts: 'district', pois: 'poi', characters: 'char', storylines: 'story' };
 const typeLabels = { factions: 'Faction', districts: 'District', pois: 'POI', characters: 'Character', storylines: 'Storyline' };
 const arrayFields = new Set(['aliases','tags','narrativeConstraints','doNotRevealYet','sourceNotes','relatedFactionIds','relatedDistrictIds','relatedPoiIds','relatedCharacterIds','relatedStorylineIds','playableScripts','territoryDistrictIds','headquartersPoiIds','coreBusiness','allies','enemies','visualKeywords','missionTypes','atmosphere','dominantFactions','keyPoiIds','storyUsage','gameplayUsage','relatedPlayableCharacters','relatedBosses']);
 
-const readDrafts = () => readJsonArray(draftsPath);
+const readDrafts = async () => {
+  await ensureJsonArrayFile(draftsPath);
+  return readJsonArray(draftsPath);
+};
 const writeDrafts = (records) => writeJsonArray(draftsPath, records);
 const safeId = (value) => path.basename(String(value || ''));
-const extensionOf = (file) => path.extname(file.name || file.filename || '').toLowerCase();
-const uploadedAt = (file) => file.addedAt || file.uploadedAt || new Date().toISOString();
+const extensionOf = (file = {}) => path.extname(file.name || file.filename || '').toLowerCase();
 const nowStamp = () => new Date().toISOString();
 const cleanName = (name) => String(name || 'Untitled Dossier').replace(/\.[^.]+$/, '').trim() || 'Untitled Dossier';
 const splitList = (value) => {
@@ -61,9 +61,9 @@ const makeDraft = ({ targetType, asset, file, parserMode }) => ({
   id: `draft-${crypto.randomUUID()}`,
   targetType,
   asset: normalizeAsset(targetType, asset),
-  sourceFileId: file.id,
-  sourceFileName: file.name,
-  sourceFilePath: `uploads/${file.folder || 'documents'}/${file.filename}`,
+  sourceFileId: file.id || file.filename || file.name || 'inline-evidence',
+  sourceFileName: file.name || file.filename || 'Inline Evidence',
+  sourceFilePath: file.filename ? `uploads/${file.folder || 'documents'}/${file.filename}` : '',
   parserMode,
   status: 'needs_review',
   createdAt: nowStamp(),
@@ -77,7 +77,7 @@ const findUpload = async (id) => {
   const folder = record.folder || (record.filename && ['.jpg','.jpeg','.png','.gif','.webp','.svg'].includes(path.extname(record.filename).toLowerCase()) ? 'images' : 'documents');
   return { ...record, folder };
 };
-const uploadPath = (file) => path.join(uploadFolders[file.folder || 'documents'], file.filename);
+const uploadPath = (file) => file.filename ? path.join(uploadFolders[file.folder || 'documents'], file.filename) : undefined;
 
 const detectParserMode = (file) => {
   const ext = extensionOf(file);
@@ -87,6 +87,40 @@ const detectParserMode = (file) => {
   if (ext === '.json') return 'Existing Archive JSON';
   if (['.pdf','.doc','.docx'].includes(ext)) return 'raw_document';
   return 'Raw Text';
+};
+
+const targetTypeFromMode = (mode, fallback = 'characters') => {
+  const normalized = String(mode || '').toLowerCase();
+  if (normalized.includes('faction')) return 'factions';
+  if (normalized.includes('district')) return 'districts';
+  if (normalized.includes('poi')) return 'pois';
+  if (normalized.includes('storyline')) return 'storylines';
+  if (normalized.includes('character')) return 'characters';
+  return fallback;
+};
+
+const draftTargetType = (value, fallback = 'characters') => assetTypes.includes(value) ? value : fallback;
+
+const requestFileInfo = (body = {}) => {
+  const supplied = body.file && typeof body.file === 'object' ? body.file : {};
+  const name = supplied.name || body.fileName || body.name || supplied.filename || body.filename || 'Inline Evidence';
+  const filename = supplied.filename || body.filename || '';
+  return {
+    ...supplied,
+    id: supplied.id || body.fileId || filename || name,
+    name,
+    filename,
+    type: supplied.type || body.fileType || body.type || '',
+    folder: supplied.folder || (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg'].includes(path.extname(filename || name).toLowerCase()) ? 'images' : 'documents'),
+  };
+};
+
+const fileExists = async (filePath) => Boolean(filePath && await fs.access(filePath).then(() => true).catch(() => false));
+const inlineText = (body = {}) => {
+  if (typeof body.content === 'string') return body.content;
+  if (typeof body.text === 'string') return body.text;
+  if (typeof body.file?.content === 'string') return body.file.content;
+  return undefined;
 };
 
 const parseCsv = (text) => {
@@ -163,9 +197,9 @@ const createBackup = async () => {
   const stamp = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
   const payload = {};
   for (const [type, fileName] of Object.entries(assetFiles)) {
-    if (type === 'pitches') continue;
     payload[type] = await readJsonArray(path.join(dataDir, fileName));
   }
+  payload.intakeDrafts = await readDrafts();
   const backupPath = path.join(backupsDir, `backup-before-import-${stamp}.json`);
   await fs.writeFile(backupPath, `${JSON.stringify({ createdAt: nowStamp(), payload }, null, 2)}\n`, 'utf8');
   return { path: backupPath, filename: path.basename(backupPath) };
@@ -199,19 +233,27 @@ const fileDraft = async (draft, { mergeIntoId } = {}) => {
 
 router.post('/parse', async (req, res, next) => {
   try {
-    const file = await findUpload(safeId(req.body.fileId));
-    if (!file) return res.status(404).json({ error: `Upload not found: ${req.body.fileId}` });
-    const mode = req.body.parserMode === 'Auto Detect' || !req.body.parserMode ? detectParserMode(file) : req.body.parserMode;
+    const body = req.body || {};
+    await ensureJsonArrayFile(draftsPath);
+    const uploadedFile = body.fileId ? await findUpload(safeId(body.fileId)) : undefined;
+    const file = uploadedFile || requestFileInfo(body);
+    const mode = body.parserMode === 'Auto Detect' || !body.parserMode ? detectParserMode(file) : body.parserMode;
     const ext = extensionOf(file);
     const fullPath = uploadPath(file);
     const response = { file, parserMode: mode, status: 'parsed', message: '', preview: undefined, drafts: [] };
+
+    if (body.fileId && !uploadedFile) {
+      response.status = 'failed';
+      response.message = `Upload not found: ${body.fileId}`;
+      return res.status(400).json(response);
+    }
 
     if (mode === 'raw_document' || ['.pdf','.doc','.docx'].includes(ext)) {
       response.status = 'needs_review'; response.parserMode = 'raw_document'; response.message = 'Deep parsing not available yet';
       return res.json(response);
     }
     if (mode === 'Image Evidence' || (file.type || '').startsWith('image/')) {
-      const template = req.body.template || 'story_npc';
+      const template = body.template || 'story_npc';
       const typeByTemplate = { faction: 'factions', district: 'districts', poi: 'pois', storyline: 'storylines', playable_hero: 'characters', boss: 'characters', story_npc: 'characters' };
       const defaults = { playable_hero: { characterType: 'playable_hero' }, boss: { characterType: 'boss', spoilerLevel: 'secret' }, story_npc: { characterType: 'story_npc' } };
       response.drafts = [makeDraft({ targetType: typeByTemplate[template] || 'characters', asset: { ...(defaults[template] || {}), name: cleanName(file.name), sourceNotes: [`Created from image evidence: ${file.name}`], linkedFiles: [file.id] }, file, parserMode: 'Image Evidence' })];
@@ -219,7 +261,9 @@ router.post('/parse', async (req, res, next) => {
     }
     if (['.csv'].includes(ext) || mode.includes('Sheet')) {
       let table;
-      if (ext === '.csv') table = parseCsv(await fs.readFile(fullPath, 'utf8'));
+      const content = inlineText(body);
+      if (!content && !await fileExists(fullPath)) { response.status = 'failed'; response.message = 'Uploaded sheet file is not available on disk.'; return res.json(response); }
+      if (ext === '.csv' || content) table = parseCsv(content ?? await fs.readFile(fullPath, 'utf8'));
       else {
         try {
           const xlsx = await import('xlsx');
@@ -231,28 +275,32 @@ router.post('/parse', async (req, res, next) => {
           response.status = 'failed'; response.message = 'XLSX parsing requires optional xlsx dependency. CSV import is available.'; return res.json(response);
         }
       }
-      const targetType = req.body.targetType || 'characters';
-      const mapping = req.body.mapping || Object.fromEntries(table.headers.map((header) => [header, guessField(header, targetType)]));
+      const targetType = draftTargetType(body.targetType, targetTypeFromMode(mode));
+      const mapping = body.mapping || Object.fromEntries(table.headers.map((header) => [header, guessField(header, targetType)]));
       response.preview = { kind: 'sheet', headers: table.headers, rows: table.previewRows, guessedMapping: mapping };
-      if (req.body.createDrafts) response.drafts = rowsToDrafts(table.rows, mapping, targetType, file, mode);
+      if (body.createDrafts) response.drafts = rowsToDrafts(table.rows, mapping, targetType, file, mode);
       return res.json(response);
     }
     if (['.md','.markdown','.txt'].includes(ext) || mode === 'Raw Text') {
-      const text = await fs.readFile(fullPath, 'utf8');
-      const targetType = req.body.targetType || 'characters';
-      const splitMode = req.body.textSplitMode || 'full';
+      const content = inlineText(body);
+      if (!content && !await fileExists(fullPath)) { response.status = 'failed'; response.message = 'Uploaded text file is not available on disk.'; return res.json(response); }
+      const text = content ?? await fs.readFile(fullPath, 'utf8');
+      const targetType = draftTargetType(body.targetType, targetTypeFromMode(mode));
+      const splitMode = body.textSplitMode || 'full';
       let chunks = [{ name: cleanName(file.name), details: text.trim() }];
       if (splitMode === 'headings') chunks = splitMarkdownHeadings(text);
-      if (splitMode === 'separator') chunks = text.split(req.body.separator || '---').map((body, index) => ({ name: cleanName(`${file.name} ${index + 1}`), details: body.trim() })).filter((chunk) => chunk.details);
+      if (splitMode === 'separator') chunks = text.split(body.separator || '---').map((body, index) => ({ name: cleanName(`${file.name} ${index + 1}`), details: body.trim() })).filter((chunk) => chunk.details);
       response.preview = { kind: 'text', text: text.slice(0, 8000), chunks: chunks.slice(0, 10) };
-      if (req.body.createDrafts) response.drafts = chunks.map((chunk) => makeDraft({ targetType, asset: { name: chunk.name, details: chunk.details, summary: chunk.details.slice(0, 220), sourceNotes: [`Imported from text evidence: ${file.name}`] }, file, parserMode: 'Raw Text' }));
+      if (body.createDrafts) response.drafts = chunks.map((chunk) => makeDraft({ targetType, asset: { name: chunk.name, details: chunk.details, summary: chunk.details.slice(0, 220), sourceNotes: [`Imported from text evidence: ${file.name}`] }, file, parserMode: 'Raw Text' }));
       return res.json(response);
     }
     if (ext === '.json' || mode === 'Existing Archive JSON') {
-      const raw = await fs.readFile(fullPath, 'utf8'); const parsed = JSON.parse(raw);
+      const content = inlineText(body);
+      if (!content && !await fileExists(fullPath)) { response.status = 'failed'; response.message = 'Uploaded JSON file is not available on disk.'; return res.json(response); }
+      const raw = content ?? await fs.readFile(fullPath, 'utf8'); const parsed = JSON.parse(raw);
       response.preview = { kind: 'json', json: parsed };
-      if (req.body.createDrafts) {
-        const targetType = req.body.targetType || 'characters'; const records = Array.isArray(parsed) ? parsed : Array.isArray(parsed[targetType]) ? parsed[targetType] : [parsed];
+      if (body.createDrafts) {
+        const targetType = draftTargetType(body.targetType, targetTypeFromMode(mode)); const records = Array.isArray(parsed) ? parsed : Array.isArray(parsed[targetType]) ? parsed[targetType] : [parsed];
         response.drafts = records.map((asset) => makeDraft({ targetType, asset: { ...asset, sourceNotes: [...splitList(asset.sourceNotes), `Imported from archive JSON evidence: ${file.name}`] }, file, parserMode: 'Existing Archive JSON' }));
       }
       return res.json(response);
@@ -269,5 +317,7 @@ router.post('/drafts/:id/file', async (req, res, next) => { try { const drafts =
 router.post('/drafts/file-batch', async (req, res, next) => { try { const ids = Array.isArray(req.body?.ids) ? req.body.ids : []; if (!ids.length) return res.status(400).json({ error: 'No draft ids supplied.' }); const backup = await createBackup(); const drafts = await readDrafts(); const filed = []; for (const id of ids) { const draft = drafts.find((item) => item.id === id); if (!draft || draft.status === 'filed' || draft.status === 'rejected') continue; const asset = await fileDraft(draft); draft.status = 'filed'; draft.filedAssetId = asset.id; draft.updatedAt = nowStamp(); filed.push(asset); } await writeDrafts(drafts); res.json({ backup, filed }); } catch (error) { next(error); } });
 router.post('/backup', async (_req, res, next) => { try { res.json(await createBackup()); } catch (error) { next(error); } });
 
-if (!existsSync(draftsPath)) await fs.writeFile(draftsPath, '[]\n', 'utf8').catch(() => undefined);
+await ensureJsonArrayFile(draftsPath);
+await fs.mkdir(backupsDir, { recursive: true });
+
 export default router;
