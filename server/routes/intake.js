@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Router } from 'express';
+import xlsx from 'xlsx';
 import { assetFiles, backupsDir, dataDir, intakeDraftsPath, uploadFolders, uploadIndexPath } from '../utils/paths.js';
 import { ensureJsonArrayFile, readJsonArray, writeJsonArray } from '../utils/jsonStore.js';
 
@@ -24,7 +25,7 @@ const cleanName = (name) => String(name || 'Untitled Dossier').replace(/\.[^.]+$
 const splitList = (value) => {
   if (Array.isArray(value)) return value.map(String).map((x) => x.trim()).filter(Boolean);
   if (value === undefined || value === null || value === '') return [];
-  return String(value).split(/[;,，、|]/).map((x) => x.trim()).filter(Boolean);
+  return String(value).split(/[;,，、|\n\r]/).map((x) => x.trim()).filter(Boolean);
 };
 const scalar = (value) => Array.isArray(value) ? value.join(', ') : String(value ?? '').trim();
 
@@ -49,6 +50,7 @@ const normalizeAsset = (type, value = {}) => {
     narrativeConstraints: splitList(value.narrativeConstraints),
     doNotRevealYet: splitList(value.doNotRevealYet),
     sourceNotes: splitList(value.sourceNotes),
+    linkedFiles: splitList(value.linkedFiles),
   };
   if (type === 'characters') return { ...base, characterType: scalar(value.characterType) || 'story_npc', gender: scalar(value.gender), age: scalar(value.age), nationality: scalar(value.nationality), ethnicity: scalar(value.ethnicity), occupation: scalar(value.occupation), factionId: scalar(value.factionId), districtId: scalar(value.districtId), weapon: scalar(value.weapon), attribute: scalar(value.attribute), playableScripts: splitList(value.playableScripts), characterArc: scalar(value.characterArc), currentTimelineStatus: scalar(value.currentTimelineStatus) };
   if (type === 'factions') return { ...base, factionCategory: scalar(value.factionCategory), culturalRoot: splitList(value.culturalRoot), territoryDistrictIds: splitList(value.territoryDistrictIds), headquartersPoiIds: splitList(value.headquartersPoiIds), coreBusiness: splitList(value.coreBusiness), allies: splitList(value.allies), enemies: splitList(value.enemies), visualKeywords: splitList(value.visualKeywords), missionTypes: splitList(value.missionTypes) };
@@ -68,6 +70,8 @@ const makeDraft = ({ targetType, asset, file, parserMode }) => ({
   status: 'needs_review',
   createdAt: nowStamp(),
   updatedAt: nowStamp(),
+  rowNumber: asset.rowNumber,
+  sourceRowPreview: asset.sourceRowPreview,
 });
 
 const findUpload = async (id) => {
@@ -134,49 +138,93 @@ const parseCsv = (text) => {
     value += char;
   }
   row.push(value.trim()); if (row.some(Boolean)) rows.push(row);
+  if (!rows.length) throw new Error('CSV file is empty.');
   const headers = rows[0] || [];
-  return { headers, rows: rows.slice(1).map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']))), previewRows: rows.slice(1, 11) };
+  if (!headers.length || headers.every((header) => !String(header).trim())) throw new Error('CSV file is empty.');
+  const dataRows = rows.slice(1).filter((cells) => cells.some((cell) => String(cell ?? '').trim()));
+  return {
+    kind: 'sheet',
+    headers,
+    rowCount: dataRows.length,
+    rows: dataRows.map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']))),
+    previewRows: dataRows.slice(0, 10),
+  };
+};
+
+const parseXlsx = (fullPath) => {
+  let workbook;
+  try { workbook = xlsx.readFile(fullPath); }
+  catch (error) { throw new Error(`Failed to parse XLSX file: ${error instanceof Error ? error.message : 'Invalid workbook.'}`); }
+  const sheetName = workbook.SheetNames?.[0];
+  if (!sheetName) throw new Error('No worksheet found in this XLSX file.');
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) throw new Error('No worksheet found in this XLSX file.');
+  const matrix = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: false });
+  if (!matrix.length) throw new Error('Worksheet is empty.');
+  const headers = (matrix[0] || []).map((value) => String(value).trim());
+  if (!headers.length || headers.every((header) => !header)) throw new Error('Worksheet is empty.');
+  const dataRows = matrix.slice(1).filter((cells) => cells.some((cell) => String(cell ?? '').trim()));
+  return {
+    kind: 'sheet',
+    sheetName,
+    headers,
+    rowCount: dataRows.length,
+    rows: dataRows.map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']))),
+    previewRows: dataRows.slice(0, 10).map((cells) => headers.map((_header, index) => String(cells[index] ?? ''))),
+  };
+};
+
+const normalizeHeader = (header = '') => String(header).trim().toLowerCase().replace(/[\s_-]/g, '');
+const headerMatches = (header, candidates) => {
+  const normalized = normalizeHeader(header);
+  return candidates.some((candidate) => normalized === normalizeHeader(candidate));
 };
 
 const guessField = (header = '', targetType) => {
-  const h = header.toLowerCase().replace(/[\s_-]/g, '');
-  const has = (...keys) => keys.some((key) => h.includes(key));
-  if (has('角色名','姓名','名称','name','title')) return 'name';
-  if (has('中文名','chinesename','cnname')) return 'chineseName';
-  if (has('英文名','englishname','enname')) return 'englishName';
-  if (has('别名','alias')) return 'aliases';
-  if (has('简介','summary','brief')) return 'summary';
-  if (has('详情','设定','details','description','desc')) return 'details';
-  if (has('标签','tags')) return 'tags';
-  if (has('状态','status')) return 'status';
-  if (has('剧透','spoiler')) return 'spoilerLevel';
-  if (has('限制','constraint')) return 'narrativeConstraints';
-  if (has('暂不透露','donotreveal')) return 'doNotRevealYet';
-  if (has('来源','备注','sourcenotes','notes')) return 'sourceNotes';
-  if (has('所属帮派','faction')) return targetType === 'characters' ? 'factionId' : 'relatedFactionIds';
-  if (has('区域','district')) return targetType === 'characters' || targetType === 'pois' ? 'districtId' : 'relatedDistrictIds';
-  if (has('职业','occupation')) return 'occupation';
-  if (has('武器','weapon')) return 'weapon';
-  if (has('性别','gender')) return 'gender';
-  if (has('年龄','age')) return 'age';
-  if (has('文化','cultural')) return 'culturalRoot';
-  if (has('生意','business')) return 'coreBusiness';
-  if (has('盟友','allies')) return 'allies';
-  if (has('敌人','enemies')) return 'enemies';
-  if (has('氛围','atmosphere')) return 'atmosphere';
-  if (has('剧情','storyusage')) return 'storyUsage';
-  if (has('玩法','gameplay')) return 'gameplayUsage';
+  if (headerMatches(header, ['name','Name','名称','角色名','姓名','帮派名','区域名','点位名','剧情名','title'])) return 'name';
+  if (headerMatches(header, ['chineseName','Chinese Name','中文名','中文'])) return 'chineseName';
+  if (headerMatches(header, ['englishName','English Name','英文名','英文'])) return 'englishName';
+  if (headerMatches(header, ['aliases','alias','别名'])) return 'aliases';
+  if (headerMatches(header, ['summary','Summary','简介','概述','一句话简介','short description'])) return 'summary';
+  if (headerMatches(header, ['details','Details','详情','设定','描述','正文','description'])) return 'details';
+  if (headerMatches(header, ['tags','Tags','标签','关键词'])) return 'tags';
+  if (headerMatches(header, ['status','状态'])) return 'status';
+  if (headerMatches(header, ['spoilerLevel','spoiler','保密等级','剧透等级'])) return 'spoilerLevel';
+  if (headerMatches(header, ['characterType','角色类型','人物类型'])) return 'characterType';
+  if (headerMatches(header, ['faction','factionId','所属帮派','关联帮派','帮派'])) return targetType === 'characters' ? 'factionId' : 'relatedFactionIds';
+  if (headerMatches(header, ['district','districtId','所属区域','关联区域','区域'])) return targetType === 'characters' || targetType === 'pois' ? 'districtId' : 'relatedDistrictIds';
+  if (headerMatches(header, ['occupation','职业'])) return 'occupation';
+  if (headerMatches(header, ['weapon','武器'])) return 'weapon';
+  if (headerMatches(header, ['characterArc','角色弧光','人物弧光'])) return 'characterArc';
+  if (headerMatches(header, ['currentTimelineStatus','时间线状态','当前状态'])) return 'currentTimelineStatus';
+  if (headerMatches(header, ['narrativeConstraints','叙事限制','限制'])) return 'narrativeConstraints';
+  if (headerMatches(header, ['doNotRevealYet','暂不透露'])) return 'doNotRevealYet';
+  if (headerMatches(header, ['sourceNotes','来源','备注','notes'])) return 'sourceNotes';
+  const h = normalizeHeader(header);
+  if (h.includes('gender') || h.includes('性别')) return 'gender';
+  if (h.includes('age') || h.includes('年龄')) return 'age';
+  if (h.includes('cultural') || h.includes('文化')) return 'culturalRoot';
+  if (h.includes('business') || h.includes('生意')) return 'coreBusiness';
+  if (h.includes('allies') || h.includes('盟友')) return 'allies';
+  if (h.includes('enemies') || h.includes('敌人')) return 'enemies';
+  if (h.includes('atmosphere') || h.includes('氛围')) return 'atmosphere';
+  if (h.includes('storyusage') || h.includes('剧情用途')) return 'storyUsage';
+  if (h.includes('gameplay') || h.includes('玩法')) return 'gameplayUsage';
   return '';
 };
 
 const rowsToDrafts = (rows, mapping, targetType, file, parserMode) => rows.map((row, index) => {
   const asset = {};
   for (const [header, field] of Object.entries(mapping || {})) {
-    if (!field) continue;
+    if (!field || field === '__ignore') continue;
     asset[field] = arrayFields.has(field) ? splitList(row[header]) : row[header];
   }
-  if (!asset.name) asset.name = cleanName(`${file.name} Row ${index + 1}`);
+  const rowNumber = index + 2;
+  if (!scalar(asset.name) && !scalar(asset.chineseName) && !scalar(asset.englishName)) asset.name = cleanName(`${file.name} Row ${rowNumber}`);
+  if (!scalar(asset.name)) asset.name = scalar(asset.chineseName) || scalar(asset.englishName) || cleanName(`${file.name} Row ${rowNumber}`);
   asset.sourceNotes = [...splitList(asset.sourceNotes), `Imported from sheet evidence: ${file.name}`];
+  asset.rowNumber = rowNumber;
+  asset.sourceRowPreview = Object.fromEntries(Object.entries(row).map(([key, value]) => [key, scalar(value)]));
   return makeDraft({ targetType, asset, file, parserMode });
 });
 
@@ -259,25 +307,20 @@ router.post('/parse', async (req, res, next) => {
       response.drafts = [makeDraft({ targetType: typeByTemplate[template] || 'characters', asset: { ...(defaults[template] || {}), name: cleanName(file.name), sourceNotes: [`Created from image evidence: ${file.name}`], linkedFiles: [file.id] }, file, parserMode: 'Image Evidence' })];
       return res.json(response);
     }
-    if (['.csv'].includes(ext) || mode.includes('Sheet')) {
+    if (['.csv','.xlsx','.xls'].includes(ext) || mode.includes('Sheet')) {
       let table;
       const content = inlineText(body);
       if (!content && !await fileExists(fullPath)) { response.status = 'failed'; response.message = 'Uploaded sheet file is not available on disk.'; return res.json(response); }
-      if (ext === '.csv' || content) table = parseCsv(content ?? await fs.readFile(fullPath, 'utf8'));
-      else {
-        try {
-          const xlsx = await import('xlsx');
-          const workbook = xlsx.readFile(fullPath); const sheet = workbook.Sheets[workbook.SheetNames[0]];
-          const matrix = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-          const headers = (matrix[0] || []).map(String);
-          table = { headers, previewRows: matrix.slice(1, 11), rows: matrix.slice(1).map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index] ?? '']))) };
-        } catch {
-          response.status = 'failed'; response.message = 'XLSX parsing requires optional xlsx dependency. CSV import is available.'; return res.json(response);
-        }
+      try {
+        if (ext === '.csv' || content) table = parseCsv(content ?? await fs.readFile(fullPath, 'utf8'));
+        else table = parseXlsx(fullPath);
+      } catch (error) {
+        response.status = 'failed'; response.message = error instanceof Error ? error.message : 'Failed to parse sheet file.'; return res.json(response);
       }
       const targetType = draftTargetType(body.targetType, targetTypeFromMode(mode));
-      const mapping = body.mapping || Object.fromEntries(table.headers.map((header) => [header, guessField(header, targetType)]));
-      response.preview = { kind: 'sheet', headers: table.headers, rows: table.previewRows, guessedMapping: mapping };
+      const guessedMapping = Object.fromEntries(table.headers.map((header) => [header, guessField(header, targetType)]));
+      const mapping = body.mapping && Object.keys(body.mapping).length ? body.mapping : guessedMapping;
+      response.preview = { kind: 'sheet', sheetName: table.sheetName, headers: table.headers, rows: table.previewRows, rowCount: table.rowCount, guessedMapping, mapping };
       if (body.createDrafts) response.drafts = rowsToDrafts(table.rows, mapping, targetType, file, mode);
       return res.json(response);
     }
@@ -314,7 +357,7 @@ router.post('/drafts', async (req, res, next) => { try { const incoming = Array.
 router.put('/drafts/:id', async (req, res, next) => { try { const drafts = await readDrafts(); const index = drafts.findIndex((draft) => draft.id === req.params.id); if (index === -1) return res.status(404).json({ error: `Draft not found: ${req.params.id}` }); drafts[index] = { ...drafts[index], ...req.body, id: req.params.id, updatedAt: nowStamp() }; await writeDrafts(drafts); res.json(drafts[index]); } catch (error) { next(error); } });
 router.delete('/drafts/:id', async (req, res, next) => { try { const drafts = await readDrafts(); const nextDrafts = drafts.map((draft) => draft.id === req.params.id ? { ...draft, status: 'rejected', updatedAt: nowStamp() } : draft); if (nextDrafts.every((draft) => draft.id !== req.params.id)) return res.status(404).json({ error: `Draft not found: ${req.params.id}` }); await writeDrafts(nextDrafts); res.sendStatus(204); } catch (error) { next(error); } });
 router.post('/drafts/:id/file', async (req, res, next) => { try { const drafts = await readDrafts(); const index = drafts.findIndex((draft) => draft.id === req.params.id); if (index === -1) return res.status(404).json({ error: `Draft not found: ${req.params.id}` }); const asset = await fileDraft(drafts[index], req.body); drafts[index] = { ...drafts[index], status: 'filed', filedAssetId: asset.id, updatedAt: nowStamp() }; await writeDrafts(drafts); res.json({ draft: drafts[index], asset }); } catch (error) { next(error); } });
-router.post('/drafts/file-batch', async (req, res, next) => { try { const ids = Array.isArray(req.body?.ids) ? req.body.ids : []; if (!ids.length) return res.status(400).json({ error: 'No draft ids supplied.' }); const backup = await createBackup(); const drafts = await readDrafts(); const filed = []; for (const id of ids) { const draft = drafts.find((item) => item.id === id); if (!draft || draft.status === 'filed' || draft.status === 'rejected') continue; const asset = await fileDraft(draft); draft.status = 'filed'; draft.filedAssetId = asset.id; draft.updatedAt = nowStamp(); filed.push(asset); } await writeDrafts(drafts); res.json({ backup, filed }); } catch (error) { next(error); } });
+router.post('/drafts/file-batch', async (req, res, next) => { try { const ids = Array.isArray(req.body?.ids) ? req.body.ids : []; if (!ids.length) return res.status(400).json({ error: 'No draft ids supplied.' }); let backup; try { backup = await createBackup(); } catch (error) { return res.status(500).json({ error: 'Backup failed. Batch filing aborted.' }); } const drafts = await readDrafts(); const filed = []; for (const id of ids) { const draft = drafts.find((item) => item.id === id); if (!draft || draft.status === 'filed' || draft.status === 'rejected') continue; const asset = await fileDraft(draft); draft.status = 'filed'; draft.filedAssetId = asset.id; draft.updatedAt = nowStamp(); filed.push(asset); } await writeDrafts(drafts); res.json({ backup, filed }); } catch (error) { next(error); } });
 router.post('/backup', async (_req, res, next) => { try { res.json(await createBackup()); } catch (error) { next(error); } });
 
 await ensureJsonArrayFile(draftsPath);
