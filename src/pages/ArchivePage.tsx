@@ -43,7 +43,7 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
       <div className="mb-5 border border-brass/25 bg-walnut/40 p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div><p className="type-label text-brass">{eyebrow}</p><h2 className="font-display text-3xl text-ivory">{title}</h2></div>
-          <div className="flex flex-wrap gap-2"><button disabled={readOnly} title={readOnly ? '本地接口离线，当前为只读模式。' : undefined} onClick={() => setPickingType(type)} className="evidence-button disabled:cursor-not-allowed disabled:opacity-50">新建档案</button>{type === 'districts' ? <button disabled={readOnly} title={readOnly ? '本地接口离线，当前为只读模式。' : undefined} onClick={() => setPickingType('pois')} className="evidence-button disabled:cursor-not-allowed disabled:opacity-50">新建地点</button> : null}</div>
+          <div className="flex flex-wrap gap-2"><button disabled={readOnly} title={readOnly ? '本地接口离线，当前为只读模式。' : undefined} onClick={() => setPickingType(type)} className="evidence-button disabled:cursor-not-allowed disabled:opacity-50">新建</button>{type === 'districts' ? <button disabled={readOnly} title={readOnly ? '本地接口离线，当前为只读模式。' : undefined} onClick={() => setPickingType('pois')} className="evidence-button disabled:cursor-not-allowed disabled:opacity-50">新建地点</button> : null}</div>
         </div>
         {readOnly ? <p className="mt-3 border border-crimson/40 bg-burgundy/45 p-2 font-mono text-xs text-paper">本地接口离线，当前为只读模式。</p> : null}
       </div>
@@ -52,14 +52,14 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
         <select className="paper-input" value={filters.status ?? ''} onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}><option value="">全部状态</option>{['canon','draft','deprecated','under_review'].map((item) => <option key={item} value={item}>{statusLabel(item)}</option>)}</select>
         <select className="paper-input" value={filters.spoilerLevel ?? ''} onChange={(e) => setFilters({ ...filters, spoilerLevel: e.target.value || undefined })}><option value="">全部保密等级</option>{['public','internal','secret'].map((item) => <option key={item} value={item}>{spoilerLabel(item)}</option>)}</select>
         <select className="paper-input" value={filters.tag ?? ''} onChange={(e) => setFilters({ ...filters, tag: e.target.value || undefined })}><option value="">全部标签</option>{tags.map((item) => <option key={item}>{item}</option>)}</select>
-        <select className="paper-input" value={completenessFilter} onChange={(e) => setCompletenessFilter(e.target.value as CompletenessStatus | '')}><option value="">全部完整度</option><option value="complete">完整</option><option value="needs_review">需要补充</option><option value="incomplete">不完整</option></select>
+        <select className="paper-input" value={completenessFilter} onChange={(e) => setCompletenessFilter(e.target.value as CompletenessStatus | '')}><option value="">全部完整度</option><option value="complete">完整</option><option value="needs_review">待补充</option><option value="incomplete">不完整</option></select>
         <select className="paper-input" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupByMode)}>{groupOptionsForType(type).map((item) => <option key={item.value} value={item.value}>分组： {item.label}</option>)}</select>
       </div>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="space-y-4">
           {grouped.map((group) => (
             <section key={group.key}>
-              {groupBy !== 'none' ? <div className="mb-3 border-l-8 border-brass bg-espresso/80 px-4 py-2 shadow-dossier"><p className="type-label text-brass">FILE CABINET DRAWER</p><h3 className="font-display text-2xl capitalize text-ivory">{group.label} <span className="font-mono text-sm text-paper/55">({group.assets.length})</span></h3></div> : null}
+              {groupBy !== 'none' ? <div className="mb-3 border-l-8 border-brass bg-espresso/80 px-4 py-2 shadow-dossier"><p className="type-label text-brass">档案分组</p><h3 className="font-display text-2xl capitalize text-ivory">{group.label} <span className="font-mono text-sm text-paper/55">({group.assets.length})</span></h3></div> : null}
               <div className="grid gap-4 md:grid-cols-2">{group.assets.map((asset) => <AssetCard key={asset.id} asset={asset} files={files} active={asset.id === selected?.id} onSelect={() => setSelectedId(asset.id)} />)}</div>
             </section>
           ))}

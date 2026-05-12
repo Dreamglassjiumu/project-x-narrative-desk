@@ -3,7 +3,7 @@ import type { AnyAsset } from '../../data';
 import type { DossierTemplateId } from '../templates/templateDefaults';
 import { templateById } from '../templates/templateDefaults';
 import { DuplicateWarning } from '../intake/DuplicateWarning';
-import { statusLabel, spoilerLabel } from '../../i18n/zhCN';
+import { characterTypeLabel, statusLabel, spoilerLabel } from '../../i18n/zhCN';
 import { detectDuplicates } from '../../utils/duplicateDetection';
 import type { AssetBundle } from '../../utils/api';
 import type { AssetType } from '../../utils/assetHelpers';
@@ -89,7 +89,7 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
       <span className="field-label">{nice(field)}</span>
       {isSelectField(field) ? (
         <select className="paper-input" value={String(draft[field] ?? '')} onChange={(event) => set(field, event.target.value)}>
-          {optionsFor(field).map((option) => <option key={option} value={option}>{field === 'status' ? statusLabel(option) : field === 'spoilerLevel' ? spoilerLabel(option) : option}</option>)}
+          {optionsFor(field).map((option) => <option key={option} value={option}>{field === 'status' ? statusLabel(option) : field === 'spoilerLevel' ? spoilerLabel(option) : field === 'characterType' ? characterTypeLabel(option) : option}</option>)}
         </select>
       ) : (
         <input className="paper-input" value={String(draft[field] ?? '')} onChange={(event) => set(field, event.target.value)} placeholder="请输入内容" />
@@ -104,7 +104,7 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
           <p className="type-label text-crimson">CONFIDENTIAL DOSSIER FORM</p>
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display text-3xl text-espresso">{formTitle}</h2>
-            <button className="stamp border-walnut text-walnut" onClick={onClose}>关闭档案</button>
+            <button className="stamp border-walnut text-walnut" onClick={onClose}>关闭</button>
           </div>
         </div>
 
@@ -114,7 +114,7 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
           <DuplicateWarning hits={duplicateHits} onOpen={(hit) => onOpenDuplicate?.(hit.asset)} />
           {['name', 'chineseName', 'englishName', 'category'].map(renderScalar)}
           <label className="md:col-span-2"><span className="field-label">摘要</span><textarea className="paper-input min-h-24" value={String(draft.summary ?? '')} onChange={(event) => set('summary', event.target.value)} /></label>
-          <label className="md:col-span-2"><span className="field-label">详细说明</span><textarea className="paper-input min-h-36" value={String(draft.details ?? '')} onChange={(event) => set('details', event.target.value)} /></label>
+          <label className="md:col-span-2"><span className="field-label">详情</span><textarea className="paper-input min-h-36" value={String(draft.details ?? '')} onChange={(event) => set('details', event.target.value)} /></label>
           {renderScalar('status')}
           {renderScalar('spoilerLevel')}
           <FieldArrayInput label="别名" value={arrayValue(draft.aliases)} onChange={(value) => set('aliases', value)} />
@@ -138,7 +138,7 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
             <p className="type-label text-walnut/60">LOCAL JSON FILING DESK</p>
             <div className="flex justify-end gap-3">
               <button className="stamp border-walnut text-walnut" disabled={saving} onClick={onClose}>取消</button>
-              <button className="evidence-button disabled:cursor-wait disabled:opacity-60" disabled={saving} onClick={() => void submit()}>{saving ? '正在保存…' : '保存档案'}</button>
+              <button className="evidence-button disabled:cursor-wait disabled:opacity-60" disabled={saving} onClick={() => void submit()}>{saving ? '正在保存…' : '保存'}</button>
             </div>
           </div>
         </div>

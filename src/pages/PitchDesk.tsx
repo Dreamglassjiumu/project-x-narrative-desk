@@ -54,8 +54,8 @@ function ArchiveSearchCard({ asset, onOpen, onAdd }: { asset: AnyAsset; onOpen: 
       </div>
       <p className="mt-3 text-sm leading-6 text-espresso/80">{asset.summary}</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <button className="stamp border-walnut text-walnut" onClick={onOpen}>打开档案</button>
-        <button className="stamp border-brass bg-brass/10 text-walnut" onClick={onAdd}>Add to Pitch Links</button>
+        <button className="stamp border-walnut text-walnut" onClick={onOpen}>打开</button>
+        <button className="stamp border-brass bg-brass/10 text-walnut" onClick={onAdd}>添加关联</button>
       </div>
     </article>
   );
@@ -187,7 +187,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
   return (
     <div className="grid gap-5 2xl:grid-cols-[340px_minmax(0,1fr)_390px]">
       <aside className="border border-brass/25 bg-walnut/45 p-4 shadow-dossier">
-        <p className="type-label text-brass">ARCHIVE SEARCH / FILE CABINET INDEX</p>
+        <p className="type-label text-brass">ARCHIVE SEARCH</p>
         <h2 className="mb-4 font-display text-2xl text-ivory">档案搜索</h2>
         <SearchBox value={query} onChange={setQuery} placeholder="搜索角色、帮派、区域、POI、剧情线" />
         <div className="mt-4 space-y-3">
@@ -196,7 +196,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
         </div>
         {selectedAsset ? (
           <div className="mt-4 border border-brass/35 bg-espresso/75 p-3 text-paper shadow-card">
-            <p className="type-label text-brass">打开档案</p>
+            <p className="type-label text-brass">档案详情</p>
             <h3 className="mt-2 font-display text-xl text-ivory">{selectedAsset.name}</h3>
             <p className="mt-2 text-sm leading-6 text-paper/75">{selectedAsset.details || selectedAsset.summary}</p>
           </div>

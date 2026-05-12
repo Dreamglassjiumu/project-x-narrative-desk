@@ -24,7 +24,7 @@ export function BulkEvidenceActions({ selected, files, disabled, onSaved }: { se
   };
   return (
     <div className="mb-4 border border-brass/30 bg-espresso/5 p-3">
-      <p className="type-label text-crimson">BULK EVIDENCE ORGANIZING / 批量整理</p>
+      <p className="type-label text-crimson">批量整理</p>
       <p className="mt-1 font-mono text-xs text-walnut/60">{selected.length} 个证物文件已选择。</p>
       <div className="mt-3 grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-end">
         <TagChipInput label="添加标签" value={tags} onChange={setTags} />
