@@ -25,9 +25,9 @@ const statusCopy: Record<SaveStatus, string> = {
 export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, saveStatus }: { draft: PitchDraft; manualLinks: AnyAsset[]; detected: AnyAsset[]; riskAssets: AnyAsset[]; saveStatus: SaveStatus }) {
   return (
     <aside className="border border-crimson/40 bg-espresso/80 p-4 shadow-dossier">
-      <p className="type-label text-crimson">PITCH INTELLIGENCE / RED STRING MEMO</p>
+      <p className="type-label text-crimson">PITCH MEMO</p>
       <h2 className="font-display text-2xl text-ivory">关联与提醒</h2>
-      <p className="mt-2 text-sm text-paper/65">扫描 Pitch Title + Pitch Body，并汇总手动关联资料中的限制。</p>
+      <p className="mt-2 text-sm text-paper/65">关联档案与风险提醒。</p>
 
       <section className="mt-4 border border-brass/25 bg-walnut/35 p-3">
         <p className="type-label text-brass">保存状态</p>
@@ -36,7 +36,7 @@ export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, sa
       </section>
 
       <section className="mt-4 space-y-3 border border-brass/25 bg-black/10 p-3">
-        <p className="type-label text-brass">Manual Links / 手动关联</p>
+        <p className="type-label text-brass">手动关联</p>
         <AssetPillList title="角色" assets={groupByCategory(manualLinks, 'Character')} />
         <AssetPillList title="帮派" assets={groupByCategory(manualLinks, 'Faction')} />
         <AssetPillList title="区域" assets={groupByCategory(manualLinks, 'District')} />
@@ -45,9 +45,9 @@ export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, sa
       </section>
 
       <section className="mt-4">
-        <p className="type-label text-brass">Auto Detected / 自动识别</p>
+        <p className="type-label text-brass">自动识别</p>
         <div className="mt-3 space-y-3">
-          {detected.length === 0 && <div className="border border-dashed border-brass/30 p-3 text-sm text-paper/60">尚未检测到资料名。试着输入 X、The Grimm Royals、Crenchester 或 Nikki。</div>}
+          {detected.length === 0 && <div className="border border-dashed border-brass/30 p-3 text-sm text-paper/60">暂无自动识别结果。</div>}
           {detected.map((asset) => (
             <article key={asset.id} className="bg-paper/95 p-3 text-espresso shadow-card">
               <div className="flex items-start justify-between gap-2">

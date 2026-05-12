@@ -1,7 +1,7 @@
 import type { PageKey } from '../../data';
 
 const items: Array<{ key: PageKey; label: string; code: string }> = [
-  { key: 'dashboard', label: '总览', code: '00' },
+  { key: 'dashboard', label: '案件总览', code: '00' },
   { key: 'factions', label: '帮派档案', code: '09' },
   { key: 'districts', label: '区域与地点', code: '22' },
   { key: 'characters', label: '角色卷宗', code: '47' },
@@ -17,7 +17,7 @@ export function Sidebar({ currentPage, onNavigate }: { currentPage: PageKey; onN
       <div className="mb-8 border border-brass/30 bg-walnut/60 p-4">
         <p className="type-label text-brass">SAN LIBRE PD ARCHIVE</p>
         <h1 className="font-display text-2xl text-ivory">Project：X</h1>
-        <p className="mt-1 text-sm text-paper/70">Narrative Desk / 叙事情报系统</p>
+        <p className="mt-1 text-sm text-paper/70">叙事资料库</p>
       </div>
       <nav className="space-y-2">
         {items.map((item) => {

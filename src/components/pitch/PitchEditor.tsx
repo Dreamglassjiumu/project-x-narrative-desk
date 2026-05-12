@@ -70,7 +70,7 @@ function LinkedDossierGroup({ group, selectedIds, pickerOpen, query, onOpenPicke
         <div className="absolute right-2 top-12 z-20 w-[min(28rem,calc(100vw-3rem))] border border-brass/50 bg-espresso p-3 text-paper shadow-dossier">
           <div className="flex items-start justify-between gap-3 border-b border-brass/25 pb-2">
             <div>
-              <p className="type-label text-brass">ARCHIVE PICKER / 档案选择器</p>
+              <p className="type-label text-brass">档案选择器</p>
               <h4 className="font-display text-xl text-ivory">{group.addLabel}</h4>
             </div>
             <button type="button" className="stamp border-paper/40 text-paper/75" onClick={onClosePicker}>关闭</button>
@@ -200,29 +200,29 @@ export function PitchEditor({ draft, assets, onChange }: { draft: PitchDraft; as
     <section className="dossier-panel p-5">
       <div className="mb-5 flex flex-col gap-3 border-b border-brass/30 pb-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <p className="type-label text-crimson">PITCH WRITING DESK / CASE PROPOSAL MANUSCRIPT</p>
+          <p className="type-label text-crimson">PITCH DESK</p>
           <h2 className="font-display text-3xl text-espresso">Pitch 写作区</h2>
-          <p className="mt-1 text-sm text-walnut/70">少量元信息 + 一份长正文。背景、目标、冲突、流程都直接写进正文。</p>
+          <p className="mt-1 text-sm text-walnut/70">写 Pitch 正文，并关联已有档案。</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={insertOutline} className="stamp border-walnut text-walnut">插入 Pitch 提纲</button>
+          <button onClick={insertOutline} className="stamp border-walnut text-walnut">插入提纲</button>
           <button onClick={downloadMarkdown} className="evidence-button">导出 Markdown</button>
         </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_180px_180px]">
         <label className="block xl:col-span-1">
-          <span className="field-label">Pitch 标题</span>
-          <input value={draft.title} onChange={(event) => update('title', event.target.value)} className="paper-input text-lg font-semibold" placeholder="请输入 Pitch 标题" />
+          <span className="field-label">标题</span>
+          <input value={draft.title} onChange={(event) => update('title', event.target.value)} className="paper-input text-lg font-semibold" placeholder="请输入标题" />
         </label>
         <label className="block">
-          <span className="field-label">Pitch 类型</span>
+          <span className="field-label">类型</span>
           <select value={draft.type} onChange={(event) => update('type', event.target.value as PitchDraft['type'])} className="paper-input">
             {pitchTypes.map((type) => <option key={type}>{type}</option>)}
           </select>
         </label>
         <label className="block">
-          <span className="field-label">Pitch 状态</span>
+          <span className="field-label">状态</span>
           <select value={draft.status} onChange={(event) => update('status', event.target.value as PitchDraft['status'])} className="paper-input">
             {pitchStatuses.map((status) => <option key={status}>{status}</option>)}
           </select>
@@ -232,7 +232,7 @@ export function PitchEditor({ draft, assets, onChange }: { draft: PitchDraft; as
       <LinkedDossiersPanel groups={dossierGroups} draft={draft} onUpdateLinks={updateLinks} />
 
       <label className="mt-5 block">
-        <span className="field-label">Pitch 正文</span>
+        <span className="field-label">正文</span>
         <textarea
           value={draft.body}
           onChange={(event) => update('body', event.target.value)}

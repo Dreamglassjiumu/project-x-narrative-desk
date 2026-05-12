@@ -67,7 +67,7 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
   const onCreated = (recordType: AssetType, asset: AnyAsset, file: UploadedFileRecord) => {
     onAssetsChanged({ ...bundle, [recordType]: [asset, ...(bundle[recordType] as AnyAsset[])] });
     onFilesChanged(files.map((item) => item.id === file.id ? file : item));
-    notify({ tone: 'success', title: '已从本地证物创建档案。', detail: `${asset.name} 已绑定到 ${file.name}` });
+    notify({ tone: 'success', title: '已从本地证物建档。', detail: `${asset.name} 已绑定到 ${file.name}` });
   };
 
   return (
@@ -87,7 +87,7 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
       </div>
       <div className="dossier-panel p-5">
         <div className="mb-4 border-b border-brass/30 pb-3"><p className="type-label text-crimson">LOCKER INDEX</p><h3 className="font-display text-2xl text-espresso">文件列表</h3></div>
-        <div className="mb-4 grid gap-3 md:grid-cols-3"><select className="paper-input" value={usageFilter} onChange={(e) => setUsageFilter(e.target.value)}><option value="">全部文件用途</option>{fileUsageOptions.map((item) => <option key={item} value={item}>{fileUsageLabel(item)}</option>)}</select><select className="paper-input" value={linkFilter} onChange={(e) => setLinkFilter(e.target.value as 'all' | 'linked' | 'unlinked')}><option value="all">全部</option><option value="linked">已绑定</option><option value="unlinked">未绑定</option></select><button className="stamp border-brass text-brass" onClick={() => setSelected(selected.length === visibleFiles.length ? [] : visibleFiles.map((file) => file.id))}>{selected.length === visibleFiles.length ? zh.buttons.selectNone : zh.buttons.selectVisible}</button></div>
+        <div className="mb-4 grid gap-3 md:grid-cols-3"><select className="paper-input" value={usageFilter} onChange={(e) => setUsageFilter(e.target.value)}><option value="">全部</option>{fileUsageOptions.map((item) => <option key={item} value={item}>{fileUsageLabel(item)}</option>)}</select><select className="paper-input" value={linkFilter} onChange={(e) => setLinkFilter(e.target.value as 'all' | 'linked' | 'unlinked')}><option value="all">全部</option><option value="linked">已绑定</option><option value="unlinked">未绑定</option></select><button className="stamp border-brass text-brass" onClick={() => setSelected(selected.length === visibleFiles.length ? [] : visibleFiles.map((file) => file.id))}>{selected.length === visibleFiles.length ? zh.buttons.selectNone : zh.buttons.selectVisible}</button></div>
         <BulkEvidenceActions selected={selected} files={files} disabled={!apiOnline} onSaved={(next) => { onFilesChanged(next); notify({ tone: 'success', title: '批量证物信息已更新。' }); }} />
         <div className="space-y-3">
           {visibleFiles.length === 0 ? <p className="border border-dashed border-walnut/20 bg-espresso/5 p-4 text-sm text-walnut/60">证物柜为空。</p> : null}
@@ -107,8 +107,8 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
                     <p className="mt-2 text-xs text-walnut/70">已绑定档案： {names.join(', ') || zh.none}</p><p className="text-xs text-walnut/70">主图用于： {primaryNames(file).join(', ') || zh.none}</p>
                   </div>
                   {file.folder === 'images' ? <button onClick={() => setLightboxFile(file)} className="h-24 w-24 shrink-0 border border-walnut/20 bg-paper p-1"><img src={file.url} alt={file.name} className="h-full w-full object-cover sepia" /></button> : null}<div className="flex shrink-0 flex-col gap-2">
-                    <button onClick={() => setCreatingFrom(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">创建档案</button>
-                    <button onClick={() => setBinding(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">绑定到档案</button>
+                    <button onClick={() => setCreatingFrom(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">建档</button>
+                    <button onClick={() => setBinding(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">绑定</button>
                     <button onClick={() => setDeleting(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-50">删除</button>
                   </div>
                 </div>
