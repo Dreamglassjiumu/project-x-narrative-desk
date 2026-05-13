@@ -1,4 +1,4 @@
-import type { AnyAsset, Character, District, Faction, Poi, Storyline } from '../data/types';
+import type { AnyAsset, Character, DesignAsset, District, Faction, Poi, Storyline } from '../data/types';
 import type { AssetType } from './assetHelpers';
 import type { PitchDraft, SavedPitch } from './pitch';
 
@@ -8,6 +8,7 @@ export interface AssetBundle {
   pois: Poi[];
   characters: Character[];
   storylines: Storyline[];
+  'design-assets': DesignAsset[];
   pitches: SavedPitch[];
 }
 
@@ -25,6 +26,7 @@ export interface UploadedFileRecord {
   fileUsage?: string;
   note?: string;
   caption?: string;
+  ocr?: OcrResult;
 }
 
 export interface ArchiveExport extends Partial<AssetBundle> {
@@ -38,6 +40,7 @@ export const emptyAssetBundle: AssetBundle = {
   pois: [],
   characters: [],
   storylines: [],
+  'design-assets': [],
   pitches: [],
 };
 
@@ -71,6 +74,7 @@ export const flattenAssets = (bundle: AssetBundle): AnyAsset[] => [
   ...bundle.pois,
   ...bundle.characters,
   ...bundle.storylines,
+  ...bundle['design-assets'],
 ];
 
 export const createAsset = <T extends AnyAsset>(type: AssetType, asset: Partial<T>) =>
@@ -107,11 +111,21 @@ export const upsertPitch = (pitch: Partial<SavedPitch> & PitchDraft) => {
 };
 export const deletePitch = (id: string) => deleteAsset('pitches' as AssetType, id);
 
+
+export type OcrStatus = 'none' | 'queued' | 'processing' | 'done' | 'failed' | 'manual';
+export interface OcrResult { sourceFileId: string; sourceFileName?: string; status: OcrStatus; text: string; language?: string; confidence?: number; engine?: string; createdAt?: string; updatedAt?: string; error?: string; }
+export interface OcrDesignType { id: string; label: string; targetType: AssetType; }
+export const listOcrDesignTypes = () => requestJson<OcrDesignType[]>('/api/ocr/types');
+export const getOcrResult = (fileId: string) => requestJson<OcrResult>(`/api/ocr/${encodeURIComponent(fileId)}`);
+export const runOcr = (payload: { fileId: string; language?: string; preprocess?: string }) => requestJson<OcrResult>('/api/ocr/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+export const saveOcrText = (fileId: string, payload: { text: string; language?: string; status?: OcrStatus }) => requestJson<OcrResult>(`/api/ocr/${encodeURIComponent(fileId)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+export const createOcrDraft = (payload: { fileId: string; text?: string; designType: string }) => requestJson<{ draft: IntakeDraft; targetType: AssetType; recognizedFields: Array<{ field: string; label: string; value: string }>; unrecognizedText: string; warnings: string[] }>('/api/ocr/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+
 export const exportArchive = () => requestJson<ArchiveExport>('/api/backup/export');
 export const importArchive = (payload: ArchiveExport, mode: 'merge' | 'replace') =>
   requestJson<AssetBundle>('/api/backup/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload, mode }) });
 
-export type IntakeParserMode = 'Auto Detect' | 'Faction Sheet' | 'Character Sheet' | 'District Sheet' | 'POI Sheet' | 'Storyline Sheet' | 'Raw Text' | 'Image Evidence' | 'Existing Archive JSON' | 'Sheet' | 'raw_document';
+export type IntakeParserMode = 'Auto Detect' | 'Faction Sheet' | 'Character Sheet' | 'District Sheet' | 'POI Sheet' | 'Storyline Sheet' | 'Raw Text' | 'Image Evidence' | '图片 OCR' | 'OCR 文本建档' | 'Image OCR' | 'Existing Archive JSON' | 'Sheet' | 'raw_document';
 export type IntakeDraftStatus = 'needs_review' | 'filed' | 'rejected' | 'merged' | 'reference_missing' | 'reference_merged';
 export interface IntakeDraft {
   id: string;

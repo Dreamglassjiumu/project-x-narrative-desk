@@ -9,10 +9,10 @@ import { addImportHistory, createBackup as createMaintenanceBackup, unique } fro
 
 const router = Router();
 const draftsPath = intakeDraftsPath;
-const assetTypes = ['factions', 'districts', 'pois', 'characters', 'storylines'];
-const idPrefixes = { factions: 'faction', districts: 'district', pois: 'poi', characters: 'char', storylines: 'story' };
-const typeLabels = { factions: 'Faction', districts: 'District', pois: 'POI', characters: 'Character', storylines: 'Storyline' };
-const arrayFields = new Set(['aliases','tags','narrativeConstraints','doNotRevealYet','sourceNotes','relatedFactionIds','relatedDistrictIds','relatedPoiIds','relatedCharacterIds','relatedStorylineIds','playableScripts','territoryDistrictIds','headquartersPoiIds','coreBusiness','allies','enemies','visualKeywords','missionTypes','atmosphere','dominantFactions','keyPoiIds','storyUsage','gameplayUsage','relatedPlayableCharacters','relatedBosses']);
+const assetTypes = ['factions', 'districts', 'pois', 'characters', 'storylines', 'design-assets'];
+const idPrefixes = { factions: 'faction', districts: 'district', pois: 'poi', characters: 'char', storylines: 'story', 'design-assets': 'design' };
+const typeLabels = { factions: 'Faction', districts: 'District', pois: 'POI', characters: 'Character', storylines: 'Storyline', 'design-assets': 'Design Asset' };
+const arrayFields = new Set(['aliases','tags','narrativeConstraints','doNotRevealYet','sourceNotes','relatedFactionIds','relatedDistrictIds','relatedPoiIds','relatedCharacterIds','relatedStorylineIds','playableScripts','territoryDistrictIds','headquartersPoiIds','coreBusiness','allies','enemies','visualKeywords','missionTypes','atmosphere','dominantFactions','keyPoiIds','storyUsage','gameplayUsage','relatedPlayableCharacters','relatedBosses','visualKeywords']);
 
 const readDrafts = async () => {
   await ensureJsonArrayFile(draftsPath);
@@ -58,6 +58,7 @@ const normalizeAsset = (type, value = {}) => {
   if (type === 'factions') return { ...base, factionCategory: scalar(value.factionCategory), culturalRoot: splitList(value.culturalRoot), territoryDistrictIds: splitList(value.territoryDistrictIds), headquartersPoiIds: splitList(value.headquartersPoiIds), coreBusiness: splitList(value.coreBusiness), allies: splitList(value.allies), enemies: splitList(value.enemies), visualKeywords: splitList(value.visualKeywords), missionTypes: splitList(value.missionTypes) };
   if (type === 'districts') return { ...base, realWorldReference: scalar(value.realWorldReference), atmosphere: splitList(value.atmosphere), dominantFactions: splitList(value.dominantFactions), keyPoiIds: splitList(value.keyPoiIds), storyUsage: splitList(value.storyUsage), gameplayUsage: splitList(value.gameplayUsage), districtStatus: scalar(value.districtStatus) };
   if (type === 'pois') return { ...base, districtId: scalar(value.districtId), poiTier: scalar(value.poiTier) || 'landmark', realWorldReference: scalar(value.realWorldReference), addressReference: scalar(value.addressReference), gameplayUsage: splitList(value.gameplayUsage), storyUsage: splitList(value.storyUsage) };
+  if (type === 'design-assets') return { ...base, designAssetType: scalar(value.designAssetType) || 'other', visualKeywords: splitList(value.visualKeywords) };
   return { ...base, storylineType: scalar(value.storylineType) || 'side', timeline: scalar(value.timeline), act: scalar(value.act), relatedPlayableCharacters: splitList(value.relatedPlayableCharacters), relatedBosses: splitList(value.relatedBosses), mainConflict: scalar(value.mainConflict), playerGoal: scalar(value.playerGoal), endingState: scalar(value.endingState), timelinePlacement: scalar(value.timelinePlacement), pitchStatus: scalar(value.pitchStatus) || 'under_review' };
 };
 

@@ -2,7 +2,7 @@ import type { AnyAsset } from '../../data';
 import type { AssetType } from '../../utils/assetHelpers';
 import { normalizeAssetPayload } from '../../utils/assetHelpers';
 
-export type DossierTemplateId = 'faction' | 'district' | 'poi' | 'playable_hero' | 'boss' | 'story_npc' | 'storyline';
+export type DossierTemplateId = 'faction' | 'district' | 'poi' | 'playable_hero' | 'boss' | 'story_npc' | 'storyline' | 'design_asset';
 
 export interface DossierTemplate {
   id: DossierTemplateId;
@@ -23,6 +23,7 @@ export const dossierTemplates: DossierTemplate[] = [
   { id: 'boss', englishName: 'Boss', chineseName: 'Boss', description: '关键反派档案。', type: 'characters', stamp: 'CLASSIFIED', defaults: { category: 'Character', characterType: 'boss', status: 'draft', spoilerLevel: 'secret' }, preferredFields: ['characterType', 'occupation', 'factionId', 'districtId', 'weapon', 'characterArc', 'currentTimelineStatus'] },
   { id: 'story_npc', englishName: '剧情人物', chineseName: '剧情人物', description: '剧情人物档案。', type: 'characters', stamp: 'WITNESS', defaults: { category: 'Character', characterType: 'story_npc', status: 'draft', spoilerLevel: 'internal' }, preferredFields: ['characterType', 'occupation', 'factionId', 'districtId', 'relatedStorylineIds', 'characterArc'] },
   { id: 'storyline', englishName: '剧情线', chineseName: '剧情线', description: '剧情线档案。', type: 'storylines', stamp: 'THREAD', defaults: { category: 'Storyline', status: 'draft', spoilerLevel: 'secret' }, preferredFields: ['storylineType', 'act', 'mainConflict', 'playerGoal', 'relatedCharacterIds', 'timelinePlacement'] },
+  { id: 'design_asset', englishName: 'Design Asset', chineseName: '设计资料', description: '物件、武器、载具、UI、玩法机制等通用设计资料。', type: 'design-assets', stamp: 'PROP ROOM', defaults: { category: 'Design Asset', designAssetType: 'other', status: 'draft', spoilerLevel: 'internal' }, preferredFields: ['designAssetType', 'visualKeywords', 'relatedCharacterIds', 'relatedPoiIds', 'relatedStorylineIds'] },
 ];
 
 export const templatesForType = (_type?: AssetType) => dossierTemplates;

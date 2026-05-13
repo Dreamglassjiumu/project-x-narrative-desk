@@ -25,6 +25,7 @@ function getExtraRows(asset: AnyAsset): Array<[string, string]> {
   if ('factionCategory' in asset) { add('类别', asset.factionCategory); add('文化根源', asset.culturalRoot); add('业务', asset.coreBusiness); add('任务类型', asset.missionTypes); }
   if ('poiTier' in asset) { add('地点等级', asset.poiTier); add('地址参考', asset.addressReference); add('玩法', asset.gameplayUsage); add('剧情用途', asset.storyUsage); }
   if ('atmosphere' in asset) { add('氛围', asset.atmosphere); add('现实参考', asset.realWorldReference); add('玩法用途', asset.gameplayUsage); add('剧情用途', asset.storyUsage); }
+  if ('designAssetType' in asset) { add('设计资料类型', asset.designAssetType); add('视觉关键词', asset.visualKeywords); }
   if ('storylineType' in asset) { add('剧情线类型', asset.storylineType); add('时间线', asset.timeline ?? asset.timelinePlacement); add('幕', asset.act); add('主要冲突', asset.mainConflict); add('玩家目标', asset.playerGoal); add('Pitch 状态', pitchStatusLabel(asset.pitchStatus)); }
   return rows;
 }

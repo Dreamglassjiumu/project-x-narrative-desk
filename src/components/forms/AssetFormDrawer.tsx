@@ -16,6 +16,7 @@ const spoilerLevels = ['public', 'internal', 'secret'] as const;
 const characterTypes = ['protagonist', 'playable_hero', 'boss', 'story_npc', 'faction_member', 'law_enforcement', 'civilian'];
 const storylineTypes = ['main', 'side', 'character', 'district', 'faction', 'prologue', 'event'];
 const poiTiers = ['landmark', 'safehouse', 'street', 'business', 'hideout'];
+const designAssetTypes = ['item','weapon','vehicle','outfit','equipment','collectible','clue','evidence','currency_resource','skill','ui','mechanic','art_reference','audio','vfx','animation','marketing','other'];
 
 const arrayFieldsByType: Record<AssetType, string[]> = {
   factions: ['culturalRoot', 'territoryDistrictIds', 'headquartersPoiIds', 'coreBusiness', 'allies', 'enemies', 'visualKeywords', 'missionTypes'],
@@ -23,6 +24,7 @@ const arrayFieldsByType: Record<AssetType, string[]> = {
   pois: ['gameplayUsage', 'storyUsage'],
   characters: ['playableScripts'],
   storylines: ['relatedPlayableCharacters', 'relatedBosses'],
+  'design-assets': ['visualKeywords'],
 };
 
 const scalarFieldsByType: Record<AssetType, string[]> = {
@@ -31,10 +33,11 @@ const scalarFieldsByType: Record<AssetType, string[]> = {
   pois: ['districtId', 'poiTier', 'realWorldReference', 'addressReference'],
   characters: ['characterType', 'gender', 'age', 'nationality', 'ethnicity', 'occupation', 'factionId', 'districtId', 'weapon', 'attribute', 'characterArc', 'currentTimelineStatus'],
   storylines: ['storylineType', 'act', 'mainConflict', 'playerGoal', 'endingState', 'timelinePlacement', 'pitchStatus'],
+  'design-assets': ['designAssetType'],
 };
 
 function isSelectField(field: string) {
-  return ['status', 'spoilerLevel', 'characterType', 'storylineType', 'poiTier'].includes(field);
+  return ['status', 'spoilerLevel', 'characterType', 'storylineType', 'poiTier', 'designAssetType'].includes(field);
 }
 function optionsFor(field: string) {
   if (field === 'status') return statuses;
@@ -42,9 +45,10 @@ function optionsFor(field: string) {
   if (field === 'characterType') return characterTypes;
   if (field === 'storylineType') return storylineTypes;
   if (field === 'poiTier') return poiTiers;
+  if (field === 'designAssetType') return designAssetTypes;
   return [];
 }
-const fieldLabels: Record<string, string> = { name: '名称', chineseName: '中文名', englishName: '英文名', category: '类别', status: '状态', spoilerLevel: '保密等级', characterType: '角色类型', gender: '性别', age: '年龄', nationality: '国籍', ethnicity: '族裔', occupation: '职业', factionId: '帮派 ID', districtId: '区域 ID', weapon: '武器', attribute: '属性', characterArc: '角色弧光', currentTimelineStatus: '当前时间线状态', factionCategory: '帮派类别', realWorldReference: '现实参考', districtStatus: '区域状态', poiTier: '地点等级', addressReference: '地址参考', storylineType: '剧情线类型', act: '幕', mainConflict: '主要冲突', playerGoal: '玩家目标', endingState: '结局状态', timelinePlacement: '时间线位置', pitchStatus: 'Pitch 状态', culturalRoot: '文化根源', territoryDistrictIds: '地盘区域 ID', headquartersPoiIds: '总部地点 ID', coreBusiness: '核心业务', allies: '盟友', enemies: '敌人', visualKeywords: '视觉关键词', missionTypes: '任务类型', atmosphere: '氛围', dominantFactions: '主导帮派', keyPoiIds: '关键地点 ID', storyUsage: '剧情用途', gameplayUsage: '玩法用途', playableScripts: '可玩脚本', relatedPlayableCharacters: '关联可操控角色', relatedBosses: '关联 Boss' };
+const fieldLabels: Record<string, string> = { name: '名称', chineseName: '中文名', englishName: '英文名', category: '类别', status: '状态', spoilerLevel: '保密等级', characterType: '角色类型', gender: '性别', age: '年龄', nationality: '国籍', ethnicity: '族裔', occupation: '职业', factionId: '帮派 ID', districtId: '区域 ID', weapon: '武器', attribute: '属性', characterArc: '角色弧光', currentTimelineStatus: '当前时间线状态', factionCategory: '帮派类别', realWorldReference: '现实参考', districtStatus: '区域状态', poiTier: '地点等级', addressReference: '地址参考', storylineType: '剧情线类型', act: '幕', mainConflict: '主要冲突', playerGoal: '玩家目标', endingState: '结局状态', timelinePlacement: '时间线位置', pitchStatus: 'Pitch 状态', culturalRoot: '文化根源', territoryDistrictIds: '地盘区域 ID', headquartersPoiIds: '总部地点 ID', coreBusiness: '核心业务', allies: '盟友', enemies: '敌人', visualKeywords: '视觉关键词', missionTypes: '任务类型', atmosphere: '氛围', dominantFactions: '主导帮派', keyPoiIds: '关键地点 ID', storyUsage: '剧情用途', gameplayUsage: '玩法用途', playableScripts: '可玩脚本', relatedPlayableCharacters: '关联可操控角色', relatedBosses: '关联 Boss', designAssetType: '设计资料类型' };
 const nice = (field: string) => fieldLabels[field] || field.replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase());
 const arrayValue = (value: unknown): string[] => Array.isArray(value) ? value.map(String).filter(Boolean) : String(value ?? '').split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
 const formTitleLabels: Record<AssetType, string> = {
@@ -53,6 +57,7 @@ const formTitleLabels: Record<AssetType, string> = {
   districts: '区域',
   pois: '地点',
   storylines: '剧情线',
+  'design-assets': '设计资料',
 };
 
 export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, bundle, onClose, onSubmit, onOpenDuplicate }: { open: boolean; type: AssetType; asset?: AnyAsset; templateId?: DossierTemplateId; initialAsset?: Partial<AnyAsset>; bundle: AssetBundle; onClose: () => void; onSubmit: (asset: AnyAsset) => Promise<void> | void; onOpenDuplicate?: (asset: AnyAsset) => void }) {
@@ -78,7 +83,7 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
   };
 
   const formTitle = `${asset ? 'Edit' : 'New'} ${template?.englishName ?? formTitleLabels[type] ?? assetTypeLabels[type]} Record`;
-  const allAssets = [...bundle.factions, ...bundle.districts, ...bundle.pois, ...bundle.characters, ...bundle.storylines] as AnyAsset[];
+  const allAssets = [...bundle.factions, ...bundle.districts, ...bundle.pois, ...bundle.characters, ...bundle.storylines, ...bundle['design-assets']] as AnyAsset[];
   const duplicateHits = detectDuplicates(draft as Partial<AnyAsset>, allAssets, asset?.id || String(draft.id || ''));
   const preferred = template?.preferredFields ?? [];
   const scalarFields = [...preferred.filter((field) => scalarFieldsByType[type].includes(field)), ...scalarFieldsByType[type].filter((field) => !preferred.includes(field))];

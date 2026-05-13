@@ -11,6 +11,7 @@ export const imagesDir = path.join(uploadsDir, 'images');
 export const documentsDir = path.join(uploadsDir, 'documents');
 export const uploadIndexPath = path.join(uploadsDir, '.index.json');
 export const intakeDraftsPath = path.join(dataDir, 'intake-drafts.json');
+export const ocrResultsPath = path.join(dataDir, 'ocr-results.json');
 export const backupsDir = path.join(dataDir, 'backups');
 
 export const assetFiles = {
@@ -19,6 +20,7 @@ export const assetFiles = {
   pois: 'pois.json',
   characters: 'characters.json',
   storylines: 'storylines.json',
+  'design-assets': 'design-assets.json',
   pitches: 'pitches.json',
 };
 

@@ -9,7 +9,7 @@ import { EvidenceIntake } from './pages/EvidenceIntake';
 import { emptyAssetBundle, fetchAssetBundle, flattenAssets, listUploads, type AssetBundle, type UploadedFileRecord } from './utils/api';
 import { ArchiveNoticeStack, type ArchiveNoticeMessage, type ArchiveNotifier } from './components/ui/ArchiveNotice';
 
-const mockAssetBundle: AssetBundle = { factions, districts, pois, characters, storylines, pitches: [] };
+const mockAssetBundle: AssetBundle = { factions, districts, pois, characters, storylines, 'design-assets': [], pitches: [] };
 
 export default function App() {
   const [page, setPage] = useState<PageKey>('dashboard');
@@ -63,6 +63,7 @@ export default function App() {
     districts: <ArchivePage {...archiveProps} type="districts" assets={districtAssets} eyebrow="CITY MAP & POI" title="区域与地点" />,
     characters: <ArchivePage {...archiveProps} type="characters" assets={assets.characters} eyebrow="MUGSHOT DOSSIERS" title="角色卷宗" />,
     storylines: <ArchivePage {...archiveProps} type="storylines" assets={assets.storylines} eyebrow="TYPEWRITER THREADS" title="剧情线" />,
+    'design-assets': <ArchivePage {...archiveProps} type="design-assets" assets={assets['design-assets']} eyebrow="PROP ROOM" title="设计资料" />,
     pitch: <PitchDesk bundle={assets} assets={allAssets} apiOnline={apiOnline} onAssetsChanged={setAssets} notify={notify} />,
     library: <LocalLibrary bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} onAssetsChanged={setAssets} notify={notify} onAssetsImported={(bundle) => { setAssets(bundle); void refreshAssets().catch(() => undefined); }} />,
     intake: <EvidenceIntake bundle={assets} files={files} apiOnline={apiOnline} onFilesChanged={setFiles} onAssetsChanged={setAssets} notify={notify} />,

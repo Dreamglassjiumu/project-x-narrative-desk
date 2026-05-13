@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { assetFiles, backupsDir, dataDir, intakeDraftsPath, uploadFolders, uploadIndexPath, importHistoryPath } from './paths.js';
 import { ensureJsonArrayFile, readJsonArray, writeJsonArray } from './jsonStore.js';
 
-export const dossierTypes = ['factions', 'districts', 'pois', 'characters', 'storylines'];
+export const dossierTypes = ['factions', 'districts', 'pois', 'characters', 'storylines', 'design-assets'];
 export const allDataKeys = [...dossierTypes, 'pitches'];
 const arrayRefFields = ['relatedFactionIds','relatedDistrictIds','relatedPoiIds','relatedCharacterIds','relatedStorylineIds','territoryDistrictIds','headquartersPoiIds','keyPoiIds','dominantFactions','relatedPlayableCharacters','relatedBosses'];
 const scalarRefFields = ['factionId','districtId','primaryEvidenceId'];

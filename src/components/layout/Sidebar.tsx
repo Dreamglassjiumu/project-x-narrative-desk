@@ -6,6 +6,7 @@ const items: Array<{ key: PageKey; label: string; code: string }> = [
   { key: 'districts', label: '区域与地点', code: '22' },
   { key: 'characters', label: '角色卷宗', code: '47' },
   { key: 'storylines', label: '剧情线', code: '61' },
+  { key: 'design-assets', label: '设计资料', code: 'DA' },
   { key: 'pitch', label: 'Pitch 写作台', code: 'PX' },
   { key: 'library', label: '本地资料库', code: 'EV' },
   { key: 'intake', label: '证物接收台', code: 'IN' },
