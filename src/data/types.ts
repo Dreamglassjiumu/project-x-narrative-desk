@@ -1,5 +1,5 @@
 export type AssetStatus = 'canon' | 'draft' | 'deprecated' | 'under_review';
-export type SpoilerLevel = 'public' | 'internal' | 'secret';
+export type SpoilerLevel = 'public' | 'internal' | 'secret' | 'classified';
 
 export interface NarrativeAsset {
   id: string;
@@ -62,6 +62,7 @@ export interface Faction extends NarrativeAsset {
 }
 
 export interface District extends NarrativeAsset {
+  districtType?: string;
   realWorldReference: string;
   atmosphere: string[];
   dominantFactions: string[];
@@ -73,14 +74,18 @@ export interface District extends NarrativeAsset {
 
 export interface Poi extends NarrativeAsset {
   districtId: string;
+  poiType?: string;
   poiTier: 'landmark' | 'safehouse' | 'street' | 'business' | 'hideout';
   realWorldReference: string;
   addressReference: string;
+  location?: string;
+  function?: string;
+  owner?: string;
   gameplayUsage: string[];
   storyUsage: string[];
 }
 
-export type DesignAssetType = 'item' | 'weapon' | 'vehicle' | 'outfit' | 'equipment' | 'collectible' | 'clue' | 'evidence' | 'currency_resource' | 'skill' | 'ui' | 'mechanic' | 'art_reference' | 'audio' | 'vfx' | 'animation' | 'marketing' | 'other';
+export type DesignAssetType = 'item' | 'weapon' | 'vehicle' | 'outfit' | 'equipment' | 'consumable' | 'collectible' | 'clue' | 'evidence' | 'currency_resource' | 'skill' | 'ui' | 'mechanic' | 'art_reference' | 'audio' | 'vfx' | 'animation' | 'marketing' | 'other';
 
 export interface DesignAsset extends NarrativeAsset {
   designAssetType: DesignAssetType;
@@ -89,6 +94,7 @@ export interface DesignAsset extends NarrativeAsset {
 
 export interface Storyline extends NarrativeAsset {
   storylineType: 'main' | 'side' | 'character' | 'district' | 'faction' | 'prologue' | 'event';
+  background?: string;
   timeline?: string;
   act: string;
   relatedPlayableCharacters?: string[];
@@ -96,6 +102,8 @@ export interface Storyline extends NarrativeAsset {
   mainConflict?: string;
   playerGoal?: string;
   endingState?: string;
+  endings?: string[];
+  dialogueText?: string;
   timelinePlacement?: string;
   pitchStatus?: string;
 }

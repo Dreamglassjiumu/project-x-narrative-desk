@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import type { IntakeDraft, OcrDesignType, OcrResult, UploadedFileRecord } from '../../utils/api';
-import { ApiError, archiveErrorMessage, createOcrDraft, getOcrResult, listOcrDesignTypes, runOcr, saveOcrText } from '../../utils/api';
+import type { IntakeDraft, OcrDesignType, OcrDraftPreview, OcrResult, UploadedFileRecord } from '../../utils/api';
+import { ApiError, archiveErrorMessage, createOcrDraft, getOcrResult, listOcrDesignTypes, previewOcrDraft, runOcr, saveOcrText } from '../../utils/api';
 import type { ArchiveNotifier } from '../ui/ArchiveNotice';
 
 const manualFallbackMessage = '本地 OCR 引擎不可用，请手动粘贴识别文本。';
@@ -18,19 +18,20 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
   const [ocr, setOcr] = useState<OcrResult>({ sourceFileId: file.id, sourceFileName: file.name, status: 'none', text: '' });
   const [text, setText] = useState('');
   const [language, setLanguage] = useState('chi_sim+eng');
+  const [preprocess, setPreprocess] = useState('original');
   const [designType, setDesignType] = useState('other_design');
   const [types, setTypes] = useState<OcrDesignType[]>([]);
   const [busy, setBusy] = useState(false);
   const [hasRunAttempt, setHasRunAttempt] = useState(false);
   const runningRef = useRef(false);
   const [message, setMessage] = useState('OCR 结果不会直接入库，请在草稿区确认。');
-  const [preview, setPreview] = useState<{ recognizedFields: Array<{ field: string; label: string; value: string }>; unrecognizedText: string; warnings: string[] } | null>(null);
+  const [preview, setPreview] = useState<OcrDraftPreview | null>(null);
 
   useEffect(() => {
     if (!apiOnline) return;
     let cancelled = false;
     setHasRunAttempt(false);
-    void getOcrResult(file.id).then((result) => { if (!cancelled) { setOcr(result); setText(result.text || ''); setLanguage(result.language || 'chi_sim+eng'); } }).catch(() => undefined);
+    void getOcrResult(file.id).then((result) => { if (!cancelled) { setOcr(result); setText(result.text || ''); setLanguage(result.language || 'chi_sim+eng'); setPreprocess(result.preprocess || 'original'); } }).catch(() => undefined);
     void listOcrDesignTypes().then((items) => { if (!cancelled) setTypes(items); }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [apiOnline, file.id]);
@@ -42,7 +43,7 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     setHasRunAttempt(true);
     setBusy(true); setMessage('识别中 · 请等待本地 OCR 引擎处理，结果需要人工校对。');
     try {
-      const result = await runOcr({ fileId: file.id, language });
+      const result = await runOcr({ fileId: file.id, language, preprocess });
       setOcr(result); setText(result.text || ''); setMessage(result.text ? '识别完成。请先校对识别文本，再生成草稿。' : result.error || '没有识别到文字。');
       notify?.({ tone: 'success', title: 'OCR 识别完成', detail: file.name });
     } catch (error) {
@@ -65,11 +66,21 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     if (!designType) { setMessage('请选择资料类型。'); return; }
     setBusy(true);
     try {
+      const result = await previewOcrDraft({ fileId: file.id, text, designType });
+      setPreview(result);
+      setMessage('草稿预览已生成。请确认字段与目标文件后再写入 Parsed Drafts。');
+    } catch (error) { const friendly = archiveErrorMessage(error, '生成草稿预览失败。'); setMessage(friendly); notify?.({ tone: 'error', title: friendly }); }
+    finally { setBusy(false); }
+  };
+  const confirmDraft = async () => {
+    if (!preview) return;
+    setBusy(true);
+    try {
       const result = await createOcrDraft({ fileId: file.id, text, designType });
-      setPreview({ recognizedFields: result.recognizedFields, unrecognizedText: result.unrecognizedText, warnings: result.warnings });
+      setPreview({ ...preview, ...result });
       onDraftCreated?.(result.draft);
-      setMessage('草稿已生成，请到解析草稿区确认。');
-      notify?.({ tone: 'success', title: '草稿已生成，请到解析草稿区确认。', detail: `${result.draft.asset.name} · ${result.targetType}` });
+      setMessage('草稿已写入 Parsed Drafts，请到解析草稿区确认。');
+      notify?.({ tone: 'success', title: '草稿已写入 Parsed Drafts。', detail: `${result.draft.asset.name} · ${result.targetType}` });
     } catch (error) { const friendly = archiveErrorMessage(error, '生成草稿失败。'); setMessage(friendly); notify?.({ tone: 'error', title: friendly }); }
     finally { setBusy(false); }
   };
@@ -82,11 +93,11 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-[120px_1fr]">
         <img src={file.url} alt={file.name} className="h-28 w-28 border-4 border-paper object-cover shadow-noir" />
-        <div className="grid gap-2 text-xs text-walnut/75"><span>文件名：{file.name}</span><span>OCR 语言：{ocr.language || language}</span><span>置信度：{ocr.confidence ? `${ocr.confidence.toFixed(1)}%` : '暂无'}</span><span>引擎：{ocr.engine || '可选本地引擎 / 手动粘贴'}</span>{ocr.error ? <span className="text-crimson">{ocr.error}</span> : null}</div>
+        <div className="grid gap-2 text-xs text-walnut/75"><span>文件名：{file.name}</span><span>OCR 语言：{ocr.language || language}</span><span>置信度：{ocr.confidence ? `${(ocr.confidence * 100).toFixed(1)}%` : '暂无'}</span><span>引擎：{ocr.engine || '可选本地引擎 / 手动粘贴'}</span>{ocr.error ? <span className="text-crimson">{ocr.error}</span> : null}</div>
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
         <label><span className="field-label">识别语言</span><select className="paper-input" value={language} onChange={(e) => setLanguage(e.target.value)}>{languageOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-        <label><span className="field-label">图片预处理</span><select className="paper-input" defaultValue="original"><option value="original">使用原图</option><option value="contrast">提高对比度（预留）</option></select></label>
+        <label><span className="field-label">图片预处理</span><select className="paper-input" value={preprocess} onChange={(e) => setPreprocess(e.target.value)}><option value="original">使用原图</option><option value="contrast">提高对比度（预留）</option><option value="grayscale">灰度识别（预留）</option></select></label>
         <label><span className="field-label">资料类型</span><select className="paper-input" value={designType} onChange={(e) => setDesignType(e.target.value)}>{types.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       </div>
       <label className="mt-3 block"><span className="field-label">识别文本 · 手动粘贴识别文本</span><textarea className="paper-input min-h-44" value={text} onChange={(e) => setText(e.target.value)} placeholder="本地 OCR 引擎不可用时，请手动粘贴识别文本。" /></label>
@@ -98,7 +109,23 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
         <button className="stamp border-paper/70 text-paper disabled:opacity-50" disabled={!text} onClick={() => void navigator.clipboard?.writeText(text)}>复制文本</button>
         <button className="stamp border-walnut text-walnut" onClick={() => setText('')}>清空文本</button>
       </div>
-      {preview ? <details className="mt-3 border border-walnut/20 bg-paper/60 p-2 text-xs text-walnut/80" open><summary>草稿解析预览</summary><p className="mt-2 font-bold">已识别字段</p><ul className="list-disc pl-5">{preview.recognizedFields.map((item, index) => <li key={`${item.field}-${index}`}>{item.label} → {item.field}: {item.value}</li>)}</ul><p className="mt-2 font-bold">未识别文本 / 需人工确认</p><pre className="whitespace-pre-wrap">{preview.unrecognizedText || '无'}</pre></details> : null}
+      {preview ? <div className="mt-3 border border-walnut/20 bg-paper/60 p-3 text-xs text-walnut/80">
+        <p className="font-bold text-espresso">草稿解析预览 · 尚未写入 Parsed Drafts</p>
+        <div className="mt-2 grid gap-1 md:grid-cols-2">
+          <span>目标资料类型：{preview.targetType}</span>
+          <span>目标数据文件：data/{preview.targetFile}</span>
+          <span>主证物图：{preview.sourceWillBecomePrimaryEvidence ? 'Approve & File 后设为 primaryEvidenceId' : '否'}</span>
+          <span>草稿名称：{String(preview.asset?.name || '未命名 OCR 草稿')}</span>
+        </div>
+        <p className="mt-2 font-bold">已识别字段</p>
+        <ul className="list-disc pl-5">{preview.recognizedFields.length ? preview.recognizedFields.map((item, index) => <li key={`${item.field}-${index}`}>{item.label} → {item.field}: {item.value}</li>) : <li>暂无明确字段，请返回修改文本。</li>}</ul>
+        <p className="mt-2 font-bold">未识别文本 / 需人工确认</p><pre className="whitespace-pre-wrap">{preview.unrecognizedText || '无'}</pre>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={busy} onClick={() => void confirmDraft()}>确认生成草稿</button>
+          <button className="stamp border-brass text-brass disabled:opacity-50" disabled={busy} onClick={() => setPreview(null)}>返回修改文本</button>
+          <button className="stamp border-walnut text-walnut disabled:opacity-50" disabled={busy} onClick={() => { setPreview(null); setMessage('已取消草稿生成。'); }}>取消</button>
+        </div>
+      </div> : null}
     </section>
   );
 }
