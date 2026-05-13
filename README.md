@@ -171,3 +171,44 @@ npm run dev:client
 - Storylines 剧本线索
 - Pitch Desk 三栏式结构化 pitch 编辑器
 - Local Library 本地证物柜：上传、列出、绑定 tags / dossiers、二次确认后删除 `uploads` 文件夹中的文件
+
+## 免安装 OCR 配置
+
+如果公司内网或权限限制导致无法安装系统级 Tesseract，可以使用项目内置的 portable OCR 目录。该方式不需要管理员权限、不要求写入系统 `PATH`，也不会连接云 OCR 或外部 API。
+
+1. 在项目根目录创建目录：
+
+   ```text
+   tools/ocr/tesseract/
+   ```
+
+2. 放入 OCR 可执行文件和语言包：
+
+   ```text
+   tools/
+     ocr/
+       tesseract/
+         tesseract.exe
+         tessdata/
+           eng.traineddata
+           chi_sim.traineddata
+   ```
+
+3. 重启本地 API 后端：
+
+   ```bash
+   npm run dev:server
+   ```
+
+4. 打开图片证物的 OCR 面板，点击“识别文字”。
+
+`/api/ocr/run` 会按以下顺序查找 OCR 引擎：
+
+1. 项目内 portable OCR：`tools/ocr/tesseract/tesseract.exe`
+2. `.env` 中的 `TESSERACT_CMD=...`
+3. 系统 `PATH` 中的 `tesseract`
+4. 如果都不可用，则回到手动粘贴 OCR 文本流程，并提示“未检测到本地 OCR 引擎，请手动粘贴识别文本。”
+
+语言映射为：中英混合 `chi_sim+eng`、中文 `chi_sim`、英文 `eng`。如果中文语言包不可用，系统会尝试使用英文识别，并在 OCR 面板提示“中文语言包不可用，已尝试英文识别。”
+
+如果公司安全策略不允许运行本地 `exe`，OCR 面板会显示中文提示，现有“手动粘贴识别文本 → 保存文本 → 用文本生成草稿”的流程仍可继续使用。
