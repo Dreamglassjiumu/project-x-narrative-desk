@@ -9,6 +9,8 @@ const router = Router();
 const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const maxOcrBytes = 10 * 1024 * 1024;
 const now = () => new Date().toISOString();
+const manualFallbackError = '本地 OCR 引擎不可用，请手动粘贴识别文本。';
+const ocrError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
 const safeId = (value) => path.basename(String(value || ''));
 const scalar = (value) => Array.isArray(value) ? value.join(', ') : String(value ?? '').trim();
 const splitList = (value) => {
@@ -123,14 +125,14 @@ const readOcr = async () => { await ensureJsonArrayFile(ocrResultsPath); return 
 const writeOcr = (records) => writeJsonArray(ocrResultsPath, records);
 const findUpload = async (id) => (await readJsonArray(uploadIndexPath)).find((item) => item.id === id || item.filename === id);
 const assertImage = async (file) => {
-  if (!file) throw new Error('Upload not found.');
+  if (!file) throw ocrError(404, 'Upload not found.');
   const ext = path.extname(file.name || file.filename || '').toLowerCase();
-  if (!imageExtensions.has(ext) && !(file.type || '').startsWith('image/')) throw new Error('当前文件不是图片，无法 OCR。');
-  if (!imageExtensions.has(ext)) throw new Error('当前文件不是图片，无法 OCR。');
+  if (!imageExtensions.has(ext) && !(file.type || '').startsWith('image/')) throw ocrError(400, '当前文件不是图片，无法 OCR。');
+  if (!imageExtensions.has(ext)) throw ocrError(400, '当前文件不是图片，无法 OCR。');
   const filePath = path.join(uploadFolders[file.folder || 'images'], file.filename);
   const stat = await fs.stat(filePath).catch(() => undefined);
-  if (!stat) throw new Error('图片文件不存在，无法 OCR。');
-  if (stat.size > maxOcrBytes) throw new Error('图片过大，请压缩后再识别。');
+  if (!stat) throw ocrError(404, '图片文件不存在，无法 OCR。');
+  if (stat.size > maxOcrBytes) throw ocrError(400, '图片过大，请压缩后再识别。');
   return { filePath, stat };
 };
 const upsertOcr = async (record) => {
@@ -149,7 +151,7 @@ const syncUploadOcr = async (fileId, ocr) => {
 router.get('/types', (_req, res) => res.json(designTypes));
 router.get('/', async (_req, res, next) => { try { res.json(await readOcr()); } catch (error) { next(error); } });
 router.get('/:fileId', async (req, res, next) => { try { const id = safeId(req.params.fileId); const records = await readOcr(); res.json(records.find((item) => item.sourceFileId === id) || { sourceFileId: id, status: 'none', text: '' }); } catch (error) { next(error); } });
-router.put('/:fileId', async (req, res, next) => { try { const id = safeId(req.params.fileId); const file = await findUpload(id); const record = await upsertOcr({ sourceFileId: id, sourceFileName: file?.name || req.body?.sourceFileName || id, status: req.body?.status || 'manual', text: String(req.body?.text || ''), language: req.body?.language || 'chi_sim+eng', engine: req.body?.engine || 'manual', error: '' }); await syncUploadOcr(id, { status: record.status, text: record.text, language: record.language, engine: record.engine, updatedAt: record.updatedAt }); res.json(record); } catch (error) { next(error); } });
+router.put('/:fileId', async (req, res, next) => { try { const id = safeId(req.params.fileId); const file = await findUpload(id); const text = String(req.body?.text || ''); const record = await upsertOcr({ sourceFileId: id, sourceFileName: file?.name || req.body?.sourceFileName || id, status: text.trim() ? 'manual' : 'none', text, language: req.body?.language || 'chi_sim+eng', engine: 'manual', error: '' }); await syncUploadOcr(id, { status: record.status, text: record.text, language: record.language, engine: record.engine, error: record.error, updatedAt: record.updatedAt }); res.json(record); } catch (error) { next(error); } });
 router.post('/run', async (req, res, next) => {
   try {
     const id = safeId(req.body?.fileId);
@@ -159,7 +161,7 @@ router.post('/run', async (req, res, next) => {
     await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: 'processing', text: '', language, engine: 'tesseract.js' });
     let recognize;
     try { ({ recognize } = await import('tesseract.js')); }
-    catch { const failed = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: 'failed', text: '', language, engine: 'unavailable', error: '本地 OCR 引擎不可用，请手动粘贴识别文本。' }); await syncUploadOcr(id, { status: failed.status, text: '', language, engine: 'unavailable', error: failed.error, updatedAt: failed.updatedAt }); return res.status(503).json(failed); }
+    catch { const failed = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: 'failed', text: '', language, engine: 'manual-fallback', error: manualFallbackError }); await syncUploadOcr(id, { status: failed.status, text: '', language, engine: failed.engine, error: failed.error, updatedAt: failed.updatedAt }); return res.status(503).json({ status: 'failed', engine: 'manual-fallback', error: manualFallbackError }); }
     try {
       const result = await recognize(filePath, language);
       const text = String(result?.data?.text || '').trim();
@@ -173,7 +175,11 @@ router.post('/run', async (req, res, next) => {
       await syncUploadOcr(id, { status: failed.status, text: '', language, engine: failed.engine, error: failed.error, updatedAt: failed.updatedAt });
       res.status(500).json(failed);
     }
-  } catch (error) { next(error); }
+  } catch (error) {
+    const statusCode = Number(error?.statusCode || 500);
+    if (statusCode < 500) return res.status(statusCode).json({ status: 'failed', engine: 'manual-fallback', error: error.message || 'OCR 请求失败，请检查本地服务。' });
+    next(error);
+  }
 });
 router.post('/draft', async (req, res, next) => {
   try {
