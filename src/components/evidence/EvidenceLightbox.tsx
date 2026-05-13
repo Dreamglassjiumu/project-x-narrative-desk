@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AnyAsset } from '../../data';
-import type { UploadedFileRecord } from '../../utils/api';
+import type { IntakeDraft, UploadedFileRecord } from '../../utils/api';
 import { zh } from '../../i18n/zhCN';
+import { OcrResultEditor } from '../ocr/OcrResultEditor';
+import type { ArchiveNotifier } from '../ui/ArchiveNotice';
 
 const formatSize = (size: number) => size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(2)} MB`;
 const isImage = (file?: UploadedFileRecord) => file?.folder === 'images' || file?.type?.startsWith('image/');
 
 type LightboxAction = (file: UploadedFileRecord) => void;
 
-export function EvidenceLightbox({ image, imageList, initialIndex = 0, assets = [], onClose, onSetPrimary, onBind, onOpenDossier }: { image?: UploadedFileRecord; imageList?: UploadedFileRecord[]; initialIndex?: number; assets?: AnyAsset[]; onClose: () => void; onSetPrimary?: LightboxAction; onBind?: LightboxAction; onOpenDossier?: (asset: AnyAsset) => void }) {
+export function EvidenceLightbox({ image, imageList, initialIndex = 0, assets = [], onClose, onSetPrimary, onBind, onOpenDossier, apiOnline = true, notify, onDraftCreated }: { image?: UploadedFileRecord; imageList?: UploadedFileRecord[]; initialIndex?: number; assets?: AnyAsset[]; onClose: () => void; onSetPrimary?: LightboxAction; onBind?: LightboxAction; onOpenDossier?: (asset: AnyAsset) => void; apiOnline?: boolean; notify?: ArchiveNotifier; onDraftCreated?: (draft: IntakeDraft) => void }) {
   const images = useMemo(() => (imageList?.length ? imageList : image ? [image] : []).filter(isImage), [image, imageList]);
   const [index, setIndex] = useState(Math.min(Math.max(initialIndex, 0), Math.max(images.length - 1, 0)));
   const [zoom, setZoom] = useState(1);
@@ -16,6 +18,7 @@ export function EvidenceLightbox({ image, imageList, initialIndex = 0, assets = 
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [showOcr, setShowOcr] = useState(false);
   const lightboxRef = useRef<HTMLDivElement>(null);
   const current = images[index];
   const linkedAssets = useMemo(() => current?.linkedAssetIds?.map((id) => assets.find((asset) => asset.id === id)).filter(Boolean) as AnyAsset[] ?? [], [assets, current]);
@@ -89,7 +92,8 @@ export function EvidenceLightbox({ image, imageList, initialIndex = 0, assets = 
         </div>
         <div className="grid gap-3 border border-brass/30 bg-espresso/85 p-3 md:grid-cols-[1fr_auto]">
           <div className="grid gap-1 font-mono text-xs text-paper/80 md:grid-cols-2"><span>文件类型：{current.type || zh.unknown}</span><span>大小：{formatSize(current.size)}</span><span>上传时间：{new Date(current.addedAt).toLocaleString()}</span><span>路径：uploads/{current.folder}/{current.filename}</span><span>已绑定档案：{linkedAssets.map((asset) => asset.name).join(', ') || zh.none}</span><span>主图用于：{primaryFor.map((asset) => asset.name).join(', ') || zh.none}</span></div>
-          <div className="flex flex-wrap items-center gap-2 md:justify-end">{onSetPrimary ? <button type="button" className="stamp border-crimson text-crimson" onClick={() => onSetPrimary(current)}>{zh.buttons.setPrimaryEvidence}</button> : null}{onBind ? <button type="button" className="stamp border-brass text-brass" onClick={() => onBind(current)}>{zh.buttons.bindToDossier}</button> : null}{linkedAssets[0] && onOpenDossier ? <button type="button" className="stamp border-brass text-brass" onClick={() => onOpenDossier(linkedAssets[0])}>{zh.evidence.openLinkedDossier}</button> : null}<button type="button" className="stamp border-paper/70 text-paper" onClick={copyPath}>{zh.evidence.copyPath}</button></div>
+          <div className="flex flex-wrap items-center gap-2 md:justify-end">{onSetPrimary ? <button type="button" className="stamp border-crimson text-crimson" onClick={() => onSetPrimary(current)}>{zh.buttons.setPrimaryEvidence}</button> : null}{onBind ? <button type="button" className="stamp border-brass text-brass" onClick={() => onBind(current)}>{zh.buttons.bindToDossier}</button> : null}{linkedAssets[0] && onOpenDossier ? <button type="button" className="stamp border-brass text-brass" onClick={() => onOpenDossier(linkedAssets[0])}>{zh.evidence.openLinkedDossier}</button> : null}<button type="button" className="stamp border-crimson text-crimson" onClick={() => setShowOcr((value) => !value)}>{showOcr ? '查看图片' : (current.ocr?.text ? '查看识别文本' : '识别文字')}</button><button type="button" className="stamp border-paper/70 text-paper" onClick={copyPath}>{zh.evidence.copyPath}</button></div>
+        {showOcr ? <div className="fixed bottom-24 right-4 top-24 z-[116] w-[min(92vw,520px)] overflow-auto border border-brass/40 bg-paper p-3 shadow-noir"><OcrResultEditor file={current} apiOnline={apiOnline} notify={notify} onDraftCreated={onDraftCreated} /></div> : null}
         </div>
       </div>
     </div>

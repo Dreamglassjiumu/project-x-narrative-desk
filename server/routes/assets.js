@@ -11,7 +11,7 @@ const getAssetPath = (type) => {
   return fileName ? path.join(dataDir, fileName) : undefined;
 };
 
-const idPrefixes = { factions: 'faction', districts: 'district', pois: 'poi', characters: 'char', storylines: 'story', pitches: 'pitch' };
+const idPrefixes = { factions: 'faction', districts: 'district', pois: 'poi', characters: 'char', storylines: 'story', 'design-assets': 'design', pitches: 'pitch' };
 
 const normalizeId = (value, prefix = 'asset') => {
   if (typeof value === 'string' && value.trim()) return value.trim();

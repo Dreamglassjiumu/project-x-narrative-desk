@@ -80,6 +80,13 @@ export interface Poi extends NarrativeAsset {
   storyUsage: string[];
 }
 
+export type DesignAssetType = 'item' | 'weapon' | 'vehicle' | 'outfit' | 'equipment' | 'collectible' | 'clue' | 'evidence' | 'currency_resource' | 'skill' | 'ui' | 'mechanic' | 'art_reference' | 'audio' | 'vfx' | 'animation' | 'marketing' | 'other';
+
+export interface DesignAsset extends NarrativeAsset {
+  designAssetType: DesignAssetType;
+  visualKeywords?: string[];
+}
+
 export interface Storyline extends NarrativeAsset {
   storylineType: 'main' | 'side' | 'character' | 'district' | 'faction' | 'prologue' | 'event';
   timeline?: string;
@@ -93,6 +100,6 @@ export interface Storyline extends NarrativeAsset {
   pitchStatus?: string;
 }
 
-export type AnyAsset = NarrativeAsset | Character | Faction | District | Poi | Storyline;
+export type AnyAsset = NarrativeAsset | Character | Faction | District | Poi | Storyline | DesignAsset;
 
-export type PageKey = 'dashboard' | 'factions' | 'districts' | 'characters' | 'storylines' | 'pitch' | 'library' | 'intake';
+export type PageKey = 'dashboard' | 'factions' | 'districts' | 'characters' | 'storylines' | 'design-assets' | 'pitch' | 'library' | 'intake';

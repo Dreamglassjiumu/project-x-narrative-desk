@@ -9,6 +9,7 @@ const highlightedTemplateIdsForType = (type?: AssetType): DossierTemplateId[] =>
   if (type === 'districts') return ['district', 'poi'];
   if (type === 'pois') return ['poi'];
   if (type === 'storylines') return ['storyline'];
+  if (type === 'design-assets') return ['design_asset'];
   return [];
 };
 

@@ -8,6 +8,7 @@ const titleMap: Record<PageKey, string> = {
   districts: '区域与地点',
   characters: '角色卷宗',
   storylines: '剧情线',
+  'design-assets': '设计资料',
   pitch: 'Pitch 写作台',
   library: '本地资料库',
   intake: '证物接收台',

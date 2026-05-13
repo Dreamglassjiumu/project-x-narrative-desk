@@ -4,7 +4,7 @@ import { assetFiles, dataDir } from '../utils/paths.js';
 import { readJsonArray, writeJsonArray } from '../utils/jsonStore.js';
 
 const router = Router();
-const keys = ['factions', 'districts', 'pois', 'characters', 'storylines', 'pitches'];
+const keys = ['factions', 'districts', 'pois', 'characters', 'storylines', 'design-assets', 'pitches'];
 const filePath = (key) => path.join(dataDir, assetFiles[key]);
 
 router.get('/export', async (_req, res, next) => {

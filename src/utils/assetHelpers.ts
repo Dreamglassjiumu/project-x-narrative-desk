@@ -1,7 +1,7 @@
 import type { AnyAsset } from '../data';
 import type { AssetBundle, UploadedFileRecord } from './api';
 
-export type AssetType = 'factions' | 'districts' | 'pois' | 'characters' | 'storylines';
+export type AssetType = 'factions' | 'districts' | 'pois' | 'characters' | 'storylines' | 'design-assets';
 
 export const assetTypeLabels: Record<AssetType, string> = {
   factions: '帮派',
@@ -9,6 +9,7 @@ export const assetTypeLabels: Record<AssetType, string> = {
   pois: '地点',
   characters: '角色',
   storylines: '剧情线',
+  'design-assets': '设计资料',
 };
 
 export const assetTypeFor = (asset: AnyAsset): AssetType => {
@@ -16,6 +17,7 @@ export const assetTypeFor = (asset: AnyAsset): AssetType => {
   if ('factionCategory' in asset) return 'factions';
   if ('poiTier' in asset) return 'pois';
   if ('storylineType' in asset) return 'storylines';
+  if ('designAssetType' in asset) return 'design-assets';
   return 'districts';
 };
 
@@ -59,6 +61,7 @@ export const normalizeAssetPayload = (type: AssetType, value: Partial<AnyAsset>)
   if (type === 'factions') return { ...base, factionCategory: '', culturalRoot: [], territoryDistrictIds: [], headquartersPoiIds: [], coreBusiness: [], allies: [], enemies: [], visualKeywords: [], missionTypes: [], ...(value as object) } as AnyAsset;
   if (type === 'districts') return { ...base, realWorldReference: '', atmosphere: [], dominantFactions: [], keyPoiIds: [], storyUsage: [], gameplayUsage: [], districtStatus: '', ...(value as object) } as AnyAsset;
   if (type === 'pois') return { ...base, districtId: '', poiTier: 'landmark', realWorldReference: '', addressReference: '', gameplayUsage: [], storyUsage: [], ...(value as object) } as AnyAsset;
+  if (type === 'design-assets') return { ...base, designAssetType: 'other', visualKeywords: [], ...(value as object) } as AnyAsset;
   return { ...base, storylineType: 'side', act: '', relatedPlayableCharacters: [], relatedBosses: [], mainConflict: '', playerGoal: '', endingState: '', timelinePlacement: '', pitchStatus: 'under_review', ...(value as object) } as AnyAsset;
 };
 

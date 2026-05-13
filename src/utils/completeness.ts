@@ -46,6 +46,10 @@ export function getCompleteness(asset: AnyAsset, files: UploadedFileRecord[] = [
       ['storyUsage / gameplayUsage', hasAny(poi.storyUsage, poi.gameplayUsage)],
     );
   }
+  if ('designAssetType' in asset) checks.push(
+    ['designAssetType', hasText(asset.designAssetType)],
+    ['primaryEvidenceId', hasText(asset.primaryEvidenceId)],
+  );
   if ('storylineType' in asset) {
     const storyline = asset as AnyAsset & { storylineType?: string; mainConflict?: string; playerGoal?: string; timelinePlacement?: string };
     checks.push(
