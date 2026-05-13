@@ -126,10 +126,12 @@ export const deletePitch = (id: string) => deleteAsset('pitches' as AssetType, i
 
 
 export type OcrStatus = 'none' | 'queued' | 'processing' | 'done' | 'failed' | 'manual' | 'manual_fallback';
-export interface OcrResult { sourceFileId: string; sourceFileName?: string; status: OcrStatus; text: string; language?: string; preprocess?: string; confidence?: number; engine?: string; createdAt?: string; updatedAt?: string; error?: string; }
+export interface OcrResult { sourceFileId: string; sourceFileName?: string; status: OcrStatus; text: string; language?: string; preprocess?: string; confidence?: number; engine?: string; engineStatus?: string; statusLabel?: string; createdAt?: string; updatedAt?: string; error?: string; }
+export interface OcrEngineStatus { available: boolean; engine: string; source: 'portable' | 'env' | 'system' | 'none' | string; statusLabel: string; error?: string; }
 export interface OcrDesignType { id: string; label: string; targetType: AssetType; }
 export const listOcrDesignTypes = () => requestJson<OcrDesignType[]>('/api/ocr/types');
 export const getOcrResult = (fileId: string) => requestJson<OcrResult>(`/api/ocr/${encodeURIComponent(fileId)}`);
+export const getOcrEngineStatus = () => requestJson<OcrEngineStatus>('/api/ocr/status');
 export const runOcr = (payload: { fileId: string; language?: string; preprocess?: string }) => requestJson<OcrResult>('/api/ocr/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 export const saveOcrText = (fileId: string, payload: { text: string; language?: string; status?: OcrStatus }) => requestJson<OcrResult>(`/api/ocr/${encodeURIComponent(fileId)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 export interface OcrDraftPreview { targetType: AssetType; targetFile: string; asset: Partial<AnyAsset>; recognizedFields: Array<{ field: string; label: string; value: string }>; unrecognizedText: string; sourceWillBecomePrimaryEvidence: boolean; warnings: string[]; }

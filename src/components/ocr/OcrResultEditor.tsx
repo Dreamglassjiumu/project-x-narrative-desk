@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { IntakeDraft, OcrDesignType, OcrDraftPreview, OcrResult, UploadedFileRecord } from '../../utils/api';
-import { ApiError, archiveErrorMessage, createOcrDraft, getOcrResult, listOcrDesignTypes, previewOcrDraft, runOcr, saveOcrText } from '../../utils/api';
+import { archiveErrorMessage, createOcrDraft, getOcrEngineStatus, getOcrResult, listOcrDesignTypes, previewOcrDraft, runOcr, saveOcrText } from '../../utils/api';
 import type { ArchiveNotifier } from '../ui/ArchiveNotice';
-
-const manualFallbackMessage = '本地 OCR 引擎不可用，请手动粘贴识别文本。';
 
 const languageOptions = [
   { value: 'chi_sim+eng', label: '中英混合' },
@@ -25,13 +23,15 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
   const [hasRunAttempt, setHasRunAttempt] = useState(false);
   const runningRef = useRef(false);
   const [message, setMessage] = useState('OCR 结果不会直接入库，请在草稿区确认。');
+  const [engineStatus, setEngineStatus] = useState('OCR 不可用，可手动粘贴');
   const [preview, setPreview] = useState<OcrDraftPreview | null>(null);
 
   useEffect(() => {
     if (!apiOnline) return;
     let cancelled = false;
     setHasRunAttempt(false);
-    void getOcrResult(file.id).then((result) => { if (!cancelled) { setOcr(result); setText(result.text || ''); setLanguage(result.language || 'chi_sim+eng'); setPreprocess(result.preprocess || 'original'); } }).catch(() => undefined);
+    void getOcrResult(file.id).then((result) => { if (!cancelled) { setOcr(result); setText(result.text || ''); setLanguage(result.language || 'chi_sim+eng'); setPreprocess(result.preprocess || 'original'); if (result.engineStatus || result.statusLabel) setEngineStatus(result.engineStatus || result.statusLabel || 'OCR 不可用，可手动粘贴'); } }).catch(() => undefined);
+    void getOcrEngineStatus().then((status) => { if (!cancelled) setEngineStatus(status.statusLabel || 'OCR 不可用，可手动粘贴'); }).catch(() => { if (!cancelled) setEngineStatus('OCR 不可用，可手动粘贴'); });
     void listOcrDesignTypes().then((items) => { if (!cancelled) setTypes(items); }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [apiOnline, file.id]);
@@ -44,14 +44,15 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     setBusy(true); setMessage('识别中 · 请等待本地 OCR 引擎处理，结果需要人工校对。');
     try {
       const result = await runOcr({ fileId: file.id, language, preprocess });
-      setOcr(result); setText(result.text || ''); setMessage(result.text ? '识别完成。请先校对识别文本，再生成草稿。' : result.error || '没有识别到文字。');
-      notify?.({ tone: 'success', title: 'OCR 识别完成', detail: file.name });
-    } catch (error) {
-      const isManualFallback = error instanceof ApiError && error.status === 503;
-      const friendly = isManualFallback ? manualFallbackMessage : archiveErrorMessage(error, 'OCR 请求失败，请检查本地服务。');
-      setOcr((current) => ({ ...current, status: isManualFallback ? 'manual_fallback' : 'failed', engine: isManualFallback ? 'manual-fallback' : current.engine, error: friendly }));
+      setOcr(result); setText(result.text || ''); if (result.engineStatus || result.statusLabel) setEngineStatus(result.engineStatus || result.statusLabel || 'OCR 不可用，可手动粘贴');
+      const friendly = result.text ? '识别完成。请先校对识别文本，再生成草稿。' : result.error || '没有识别到文字，请尝试更清晰的图片，或手动粘贴文本。';
       setMessage(friendly);
-      notify?.({ tone: isManualFallback ? 'info' : 'error', title: friendly });
+      notify?.({ tone: result.status === 'done' ? 'success' : 'info', title: result.status === 'done' ? 'OCR 识别完成' : friendly, detail: result.status === 'done' ? file.name : undefined });
+    } catch (error) {
+      const friendly = archiveErrorMessage(error, 'OCR 请求失败，请检查本地服务。');
+      setOcr((current) => ({ ...current, status: 'failed', error: friendly }));
+      setMessage(friendly);
+      notify?.({ tone: 'error', title: friendly });
     } finally { runningRef.current = false; setBusy(false); }
   };
   const save = async () => {
@@ -93,7 +94,7 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-[120px_1fr]">
         <img src={file.url} alt={file.name} className="h-28 w-28 border-4 border-paper object-cover shadow-noir" />
-        <div className="grid gap-2 text-xs text-walnut/75"><span>文件名：{file.name}</span><span>OCR 语言：{ocr.language || language}</span><span>置信度：{ocr.confidence ? `${(ocr.confidence * 100).toFixed(1)}%` : '暂无'}</span><span>引擎：{ocr.engine || '可选本地引擎 / 手动粘贴'}</span>{ocr.error ? <span className="text-crimson">{ocr.error}</span> : null}</div>
+        <div className="grid gap-2 text-xs text-walnut/75"><span>文件名：{file.name}</span><span>OCR 语言：{ocr.language || language}</span><span>置信度：{ocr.confidence ? `${(ocr.confidence * 100).toFixed(1)}%` : '暂无'}</span><span>引擎：{ocr.engine || '可选本地引擎 / 手动粘贴'}</span><span>引擎状态：{ocr.engineStatus || ocr.statusLabel || engineStatus}</span>{ocr.error ? <span className="text-crimson">{ocr.error}</span> : null}</div>
       </div>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
         <label><span className="field-label">识别语言</span><select className="paper-input" value={language} onChange={(e) => setLanguage(e.target.value)}>{languageOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
