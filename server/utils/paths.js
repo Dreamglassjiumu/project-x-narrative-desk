@@ -26,3 +26,5 @@ export const uploadFolders = {
   images: imagesDir,
   documents: documentsDir,
 };
+
+export const importHistoryPath = path.join(dataDir, 'import-history.json');

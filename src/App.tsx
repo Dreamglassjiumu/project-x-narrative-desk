@@ -58,7 +58,7 @@ export default function App() {
 
   const archiveProps = { bundle: assets, files, query, readOnly: !apiOnline, onAssetsChanged: setAssets, onFilesChanged: setFiles, notify };
   const content = {
-    dashboard: <Dashboard assets={assets} files={files} allAssets={allAssets} onSelectPage={setPage} loading={loadingAssets} error={assetError} />,
+    dashboard: <Dashboard assets={assets} files={files} allAssets={allAssets} onSelectPage={setPage} loading={loadingAssets} error={assetError} onAssetsChanged={setAssets} onFilesChanged={setFiles} />,
     factions: <ArchivePage {...archiveProps} type="factions" assets={assets.factions} eyebrow="GANG LEDGER" title="帮派档案" />,
     districts: <ArchivePage {...archiveProps} type="districts" assets={districtAssets} eyebrow="CITY MAP & POI" title="区域与地点" />,
     characters: <ArchivePage {...archiveProps} type="characters" assets={assets.characters} eyebrow="MUGSHOT DOSSIERS" title="角色卷宗" />,

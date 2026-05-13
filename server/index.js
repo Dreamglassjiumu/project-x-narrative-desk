@@ -3,6 +3,9 @@ import assetsRouter from './routes/assets.js';
 import uploadsRouter, { streamUploadedFile } from './routes/uploads.js';
 import backupRouter from './routes/backup.js';
 import intakeRouter from './routes/intake.js';
+import maintenanceRouter from './routes/maintenance.js';
+import importHistoryRouter from './routes/importHistory.js';
+import dossiersRouter from './routes/dossiers.js';
 import { dataDir, documentsDir, imagesDir, uploadsDir } from './utils/paths.js';
 import { ensureWorkspace } from './utils/jsonStore.js';
 
@@ -33,6 +36,9 @@ app.use('/api/assets', assetsRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/intake', intakeRouter);
+app.use('/api/maintenance', maintenanceRouter);
+app.use('/api/import-history', importHistoryRouter);
+app.use('/api/dossiers', dossiersRouter);
 app.get('/uploads/:folder/:id', streamUploadedFile);
 
 app.use((error, _req, res, _next) => {

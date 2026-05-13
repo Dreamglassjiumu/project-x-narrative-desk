@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { assetFiles, backupsDir, dataDir, documentsDir, imagesDir, intakeDraftsPath, uploadIndexPath, uploadsDir } from './paths.js';
+import { assetFiles, backupsDir, dataDir, documentsDir, imagesDir, intakeDraftsPath, uploadIndexPath, uploadsDir, importHistoryPath } from './paths.js';
 
 export const ensureWorkspace = async () => {
   await fs.mkdir(dataDir, { recursive: true });
@@ -25,6 +25,10 @@ export const ensureWorkspace = async () => {
 
   if (!existsSync(intakeDraftsPath)) {
     await fs.writeFile(intakeDraftsPath, '[]\n', 'utf8');
+  }
+
+  if (!existsSync(importHistoryPath)) {
+    await fs.writeFile(importHistoryPath, '[]\n', 'utf8');
   }
 };
 

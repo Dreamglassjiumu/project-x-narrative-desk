@@ -8,7 +8,7 @@ import { DossierTemplatePicker } from '../components/templates/DossierTemplatePi
 import type { DossierTemplateId } from '../components/templates/templateDefaults';
 import { templateById } from '../components/templates/templateDefaults';
 import type { AssetBundle, UploadedFileRecord } from '../utils/api';
-import { archiveErrorMessage, createAsset, deleteAsset, updateAsset } from '../utils/api';
+import { archiveErrorMessage, createAsset, fetchAssetBundle, getDeleteImpact, mergeDossiers, safeDeleteDossier, updateAsset } from '../utils/api';
 import type { ArchiveNotifier } from '../components/ui/ArchiveNotice';
 import type { AssetType } from '../utils/assetHelpers';
 import { assetTypeFor } from '../utils/assetHelpers';
@@ -29,6 +29,10 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
   const [creating, setCreating] = useState<{ type: AssetType; templateId: DossierTemplateId } | undefined>();
   const [pickingType, setPickingType] = useState<AssetType | undefined>();
   const [deleting, setDeleting] = useState<AnyAsset | undefined>();
+  const [deleteImpact, setDeleteImpact] = useState<{ relatedCount: number; pitchCount: number; evidenceCount: number; draftCount: number } | null>(null);
+  const [merging, setMerging] = useState<AnyAsset | undefined>();
+  const [mergeTargetId, setMergeTargetId] = useState('');
+  const [mergeMode, setMergeMode] = useState<'target' | 'source' | 'append'>('target');
   const selected = filtered.find((asset) => asset.id === selectedId) ?? filtered[0];
   const categories = [...new Set(assets.map((asset) => asset.category).filter(Boolean))];
   const tags = [...new Set(assets.flatMap((asset) => asset.tags))];
@@ -37,6 +41,8 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
   const addRecord = (recordType: AssetType, asset: AnyAsset) => { onAssetsChanged({ ...bundle, [recordType]: [asset, ...(bundle[recordType] as AnyAsset[])] }); setSelectedId(asset.id); };
   const removeRecord = (recordType: AssetType, asset: AnyAsset) => { onAssetsChanged({ ...bundle, [recordType]: (bundle[recordType] as AnyAsset[]).filter((item) => item.id !== asset.id) }); setSelectedId(undefined); };
   const openDuplicate = (asset: AnyAsset) => { setSelectedId(asset.id); setEditing(undefined); };
+  const previewDelete = async (asset: AnyAsset) => { setDeleting(asset); setDeleteImpact(null); try { const impact = await getDeleteImpact(asset.id, assetTypeFor(asset)); setDeleteImpact(impact); } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, '删除影响预览失败。') }); } };
+  const confirmMerge = async () => { if (!merging || !mergeTargetId) return; try { const result = await mergeDossiers({ sourceId: merging.id, sourceType: assetTypeFor(merging), targetId: mergeTargetId, summaryMode: mergeMode, detailsMode: mergeMode }); onAssetsChanged(await fetchAssetBundle()); setMerging(undefined); setMergeTargetId(''); notify({ tone: 'success', title: '档案合并完成。', detail: `备份：${result.backup?.filename || '已创建'}` }); } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, '合并失败。') }); } };
 
   return (
     <div>
@@ -66,7 +72,7 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
           {!filtered.length ? <div className="border border-dashed border-brass/40 bg-walnut/40 p-5 text-paper/70">没有符合当前搜索和筛选的档案。</div> : null}
           {query ? <p className="font-mono text-xs text-paper/50">搜索命中： {filtered.map((asset) => `${asset.name} [${getAssetHitTypes(asset, query).join(', ') || 'text'}]`).join(' · ')}</p> : null}
         </div>
-        <DetailPanel asset={selected} bundle={bundle} files={files} onOpenRelated={(asset) => setSelectedId(asset.id)} onEdit={setEditing} onDelete={setDeleting} readOnly={readOnly} onAssetSaved={(asset) => replaceRecord(assetTypeFor(asset), asset)} onFilesChanged={onFilesChanged} notify={notify} />
+        <DetailPanel asset={selected} bundle={bundle} files={files} onOpenRelated={(asset) => setSelectedId(asset.id)} onEdit={setEditing} onDelete={(asset) => void previewDelete(asset)} onMerge={(asset) => { setMerging(asset); setMergeTargetId(''); }} readOnly={readOnly} onAssetSaved={(asset) => replaceRecord(assetTypeFor(asset), asset)} onFilesChanged={onFilesChanged} notify={notify} />
       </div>
       <DossierTemplatePicker open={Boolean(pickingType)} type={pickingType} onClose={() => setPickingType(undefined)} onPick={(templateId) => { const template = templateById(templateId); setCreating({ type: template.type, templateId }); setPickingType(undefined); }} />
       <AssetFormDrawer open={Boolean(creating)} type={creating?.type ?? type} templateId={creating?.templateId} bundle={bundle} onClose={() => setCreating(undefined)} onOpenDuplicate={openDuplicate} onSubmit={async (asset) => {
@@ -79,10 +85,12 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
         try { const saved = await updateAsset(recordType, editing.id, asset); replaceRecord(recordType, saved); notify({ tone: 'success', title: '档案已更新。' }); }
         catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, '写入失败。') }); throw error; }
       }} />
-      <ConfirmDialog open={Boolean(deleting)} title="删除档案？" message={`将 ${deleting?.name ?? '此档案'} 从本地 JSON 删除。已绑定证物文件会保留其信息。`} confirmLabel="删除档案" onCancel={() => setDeleting(undefined)} onConfirm={async () => {
+
+      {merging ? <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4"><div className="dossier-panel max-h-[90vh] w-full max-w-xl overflow-auto p-5"><p className="type-label text-crimson">合并档案 · DOSSIER REPAIR</p><h3 className="font-display text-2xl text-espresso">将 {merging.name} 合并到目标档案</h3><p className="mt-2 text-sm text-walnut/70">执行前会自动备份；Source 将删除并替换所有引用，uploads 原始文件不会删除。summary/details 不会自动覆盖，请选择处理方式。</p><select className="paper-input mt-3" value={mergeTargetId} onChange={(e) => setMergeTargetId(e.target.value)}><option value="">选择保留的目标档案</option>{assets.filter((asset) => asset.id !== merging.id).map((asset) => <option key={asset.id} value={asset.id}>{asset.name}</option>)}</select><select className="paper-input mt-3" value={mergeMode} onChange={(e) => setMergeMode(e.target.value as 'target' | 'source' | 'append')}><option value="target">正文保留目标</option><option value="source">正文使用来源</option><option value="append">正文追加来源到目标后面</option></select><div className="mt-4 flex justify-end gap-2"><button className="stamp border-brass text-brass" onClick={() => setMerging(undefined)}>取消</button><button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!mergeTargetId} onClick={() => void confirmMerge()}>确认合并</button></div></div></div> : null}
+      <ConfirmDialog open={Boolean(deleting)} title="安全删除档案？" message={`此操作会删除 ${deleting?.name ?? '此档案'}，并从 ${deleteImpact?.relatedCount ?? '…'} 条关联档案、${deleteImpact?.pitchCount ?? '…'} 条 Pitch、${deleteImpact?.evidenceCount ?? '…'} 个证物文件中移除引用；草稿标记 ${deleteImpact?.draftCount ?? '…'} 条。执行前会自动备份，uploads 原始文件不会删除。`} confirmLabel="安全删除档案" onCancel={() => { setDeleting(undefined); setDeleteImpact(null); }} onConfirm={async () => {
         if (!deleting) return;
         const recordType = assetTypeFor(deleting);
-        try { await deleteAsset(recordType, deleting.id); removeRecord(recordType, deleting); setDeleting(undefined); notify({ tone: 'success', title: '档案已删除。' }); }
+        try { const result = await safeDeleteDossier(deleting.id, recordType); onAssetsChanged(await fetchAssetBundle()); setSelectedId(undefined); setDeleting(undefined); setDeleteImpact(null); notify({ tone: 'success', title: '档案已安全删除。', detail: `备份：${result.backup.filename}` }); }
         catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, '删除失败。') }); }
       }} />
     </div>
