@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AnyAsset } from '../../data';
 import type { AssetBundle, UploadedFileRecord } from '../../utils/api';
-import { archiveErrorMessage, deleteUpload, flattenAssets, listUploads, updateUpload, uploadFiles } from '../../utils/api';
+import { archiveErrorMessage, cleanIntakeDrafts, deleteUpload, flattenAssets, listImportHistory, listUploads, updateUpload, uploadFiles, type ImportHistoryRecord } from '../../utils/api';
 import type { AssetType } from '../../utils/assetHelpers';
 import type { ArchiveNotifier } from '../ui/ArchiveNotice';
 import { ConfirmDialog } from '../forms/ConfirmDialog';
@@ -33,10 +33,14 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
   const [usageFilter, setUsageFilter] = useState('');
   const [linkFilter, setLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
   const [lightboxFile, setLightboxFile] = useState<UploadedFileRecord | null>(null);
+  const [history, setHistory] = useState<ImportHistoryRecord[]>([]);
+  useEffect(() => { if (apiOnline) void listImportHistory().then(setHistory).catch(() => undefined); }, [apiOnline]);
   const assets = flattenAssets(bundle);
   const visibleFiles = useMemo(() => files.filter((file) => (!usageFilter || (file.fileUsage || 'other') === usageFilter) && (linkFilter === 'all' || (linkFilter === 'linked' ? (file.linkedAssetIds?.length ?? 0) > 0 : (file.linkedAssetIds?.length ?? 0) === 0))), [files, usageFilter, linkFilter]);
   const linkedNames = (file: UploadedFileRecord) => file.linkedAssetIds?.map((id) => assets.find((asset) => asset.id === id)?.name ?? id) ?? [];
   const primaryNames = (file: UploadedFileRecord) => assets.filter((asset) => asset.primaryEvidenceId === file.id || asset.primaryEvidenceId === file.filename).map((asset) => asset.name);
+  const importRecords = (file: UploadedFileRecord) => history.filter((item) => item.sourceFileId === file.id || item.sourceFileId === file.filename || item.sourceFileName === file.name || item.sourceFileName?.includes(file.name));
+  const cleanFileTestDrafts = async (file: UploadedFileRecord) => { try { const result = await cleanIntakeDrafts({ mode: file.name.toLowerCase().includes('projectx_test') ? 'projectx_test' : 'source', sourceFileName: file.name, withBackup: true }); notify({ tone: 'success', title: '该文件草稿清理完成', detail: `清理 ${result.removed} 条草稿；uploads 原始文件保留。` }); } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, '草稿清理失败。') }); } };
   const toggleSelected = (id: string, checked: boolean) => setSelected((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id));
 
   const onFiles = async (fileList: FileList | null) => {
@@ -92,7 +96,7 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
         <div className="space-y-3">
           {visibleFiles.length === 0 ? <p className="border border-dashed border-walnut/20 bg-espresso/5 p-4 text-sm text-walnut/60">证物柜为空。</p> : null}
           {visibleFiles.map((file) => {
-            const names = linkedNames(file); const unlinked = !names.length;
+            const names = linkedNames(file); const unlinked = !names.length; const imports = importRecords(file);
             return (
               <div key={file.id} className={`border ${unlinked ? 'border-crimson/40' : 'border-walnut/20'} bg-espresso/5 p-3`}>
                 <div className="flex items-start justify-between gap-4">
@@ -104,12 +108,12 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
                     <p className="text-xs text-walnut/60">{file.type || zh.unknown} · {evidenceFolder(file)} · {formatSize(file.size)}</p>
                     <p className="text-xs text-walnut/60">上传时间： {new Date(file.addedAt).toLocaleString()}</p>
                     <div className="mt-2 flex flex-wrap gap-1"><EvidenceUsageBadge usage={file.fileUsage} />{file.tags?.length ? file.tags.map((tag) => <span key={tag} className="tag-label">{tag}</span>) : <span className="tag-label opacity-60">无标签</span>}</div>
-                    <p className="mt-2 text-xs text-walnut/70">已绑定档案： {names.join(', ') || zh.none}</p><p className="text-xs text-walnut/70">主图用于： {primaryNames(file).join(', ') || zh.none}</p>
+                    <p className="mt-2 text-xs text-walnut/70">已绑定档案： {names.join(', ') || zh.none}</p><p className="text-xs text-walnut/70">主图用于： {primaryNames(file).join(', ') || zh.none}</p><div className="mt-2 border border-walnut/15 bg-paper/60 p-2 text-xs text-walnut/70"><p>此文件已导入过 {imports.reduce((sum, item) => sum + (item.filedCount || 0), 0)} 条档案</p>{imports.slice(0, 3).flatMap((item) => item.filedAssetNames || []).slice(0, 5).map((name) => <p key={name}>- {name}</p>)}<p>最近一次导入： {imports[0]?.createdAt ? new Date(imports[0].createdAt).toLocaleString() : zh.none}</p></div>
                   </div>
                   {file.folder === 'images' ? <button onClick={() => setLightboxFile(file)} className="h-24 w-24 shrink-0 border border-walnut/20 bg-paper p-1"><img src={file.url} alt={file.name} className="h-full w-full object-cover sepia" /></button> : null}<div className="flex shrink-0 flex-col gap-2">
                     <button onClick={() => setCreatingFrom(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">建档</button>
                     <button onClick={() => setBinding(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">绑定</button>
-                    <button onClick={() => setDeleting(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-50">删除</button>
+                    <button onClick={() => setSelected([file.id])} className="stamp border-brass text-brass">相关档案</button><button onClick={() => void cleanFileTestDrafts(file)} disabled={busy || !apiOnline} className="stamp border-brass text-brass disabled:opacity-50">清理草稿</button><button onClick={() => setDeleting(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-50">删除</button>
                   </div>
                 </div>
               </div>

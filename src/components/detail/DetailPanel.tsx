@@ -29,7 +29,7 @@ function getExtraRows(asset: AnyAsset): Array<[string, string]> {
   return rows;
 }
 
-export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, onDelete, readOnly, onAssetSaved, onFilesChanged, notify }: { asset?: AnyAsset; bundle: AssetBundle; files?: UploadedFileRecord[]; onOpenRelated?: (asset: AnyAsset) => void; onEdit?: (asset: AnyAsset) => void; onDelete?: (asset: AnyAsset) => void; readOnly?: boolean; onAssetSaved?: (asset: AnyAsset) => void; onFilesChanged?: (files: UploadedFileRecord[]) => void; notify?: ArchiveNotifier }) {
+export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, onDelete, onMerge, readOnly, onAssetSaved, onFilesChanged, notify }: { asset?: AnyAsset; bundle: AssetBundle; files?: UploadedFileRecord[]; onOpenRelated?: (asset: AnyAsset) => void; onEdit?: (asset: AnyAsset) => void; onDelete?: (asset: AnyAsset) => void; onMerge?: (asset: AnyAsset) => void; readOnly?: boolean; onAssetSaved?: (asset: AnyAsset) => void; onFilesChanged?: (files: UploadedFileRecord[]) => void; notify?: ArchiveNotifier }) {
   if (!asset) return <aside className="dossier-panel p-6 text-paper/70">请选择一个档案卡片以打开档案。</aside>;
   const index = makeAssetIndex(bundle);
   const related = relationKeys.flatMap((key) => asset[key].map((id) => index.get(id))).filter(Boolean) as Array<{ asset: AnyAsset; type: ReturnType<typeof assetTypeFor> }>;
@@ -50,7 +50,7 @@ export function DetailPanel({ asset, bundle, files = [], onOpenRelated, onEdit, 
           <StatusStamp status={asset.status} />
           <ClassifiedBadge level={asset.spoilerLevel} />
           <button className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? '本地接口离线，当前为只读模式。' : undefined} onClick={() => onEdit?.(asset)}>编辑</button>
-          <button className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? '本地接口离线，当前为只读模式。' : undefined} onClick={() => onDelete?.(asset)}>删除</button>
+          <button className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? '本地接口离线，当前为只读模式。' : undefined} onClick={() => onMerge?.(asset)}>合并到其他档案</button><button className="stamp border-crimson text-crimson disabled:cursor-not-allowed disabled:opacity-45" disabled={readOnly} title={readOnly ? '本地接口离线，当前为只读模式。' : undefined} onClick={() => onDelete?.(asset)}>删除</button>
         </div>
       </div>
       <PrimaryEvidenceSlot asset={asset} bundle={bundle} files={files} readOnly={readOnly} onAssetSaved={onAssetSaved} onFilesChanged={onFilesChanged} notify={notify} />
