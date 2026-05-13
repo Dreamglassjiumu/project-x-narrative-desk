@@ -14,6 +14,8 @@ const now = () => new Date().toISOString();
 const execFileAsync = promisify(execFile);
 const manualFallbackError = '未检测到本地 OCR 引擎，请手动粘贴识别文本。';
 const missingLanguagePackError = '未检测到 OCR 语言包，请检查 tools/ocr/tesseract/tessdata。';
+const missingChineseLanguagePackWarning = '未检测到简体中文语言包 chi_sim.traineddata，中文识别可能不可用。';
+const missingChineseLanguagePackError = '缺少中文语言包，请改用英文识别或手动粘贴文本。';
 const blockedError = 'OCR 程序无法运行，可能被系统权限或安全策略拦截。请手动粘贴识别文本。';
 const timeoutError = 'OCR 识别超时，请尝试更小或更清晰的图片。';
 const emptyTextError = '没有识别到文字，请尝试更清晰的图片，或手动粘贴文本。';
@@ -25,10 +27,11 @@ const ocrTimeoutMs = 45_000;
 const ocrError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
 const safeId = (value) => path.basename(String(value || ''));
 const scalar = (value) => Array.isArray(value) ? value.join(', ') : String(value ?? '').trim();
+const uniqueClean = (items) => [...new Set(items.map(String).map((item) => item.trim()).filter(Boolean))];
 const splitList = (value) => {
-  if (Array.isArray(value)) return value.map(String).map((item) => item.trim()).filter(Boolean);
+  if (Array.isArray(value)) return uniqueClean(value);
   if (value === undefined || value === null || value === '') return [];
-  return String(value).split(/[;,，、|/\n\r]/).map((item) => item.trim()).filter(Boolean);
+  return uniqueClean(String(value).split(/[;,，、；|/\n\r]/));
 };
 
 const fileExists = async (filePath) => Boolean(await fs.stat(filePath).catch(() => undefined));
@@ -44,7 +47,24 @@ const readEnvFile = async () => {
     return key ? [key, value] : [];
   }).filter((pair) => pair.length === 2));
 };
-const languageForRequest = (value) => value === 'eng' ? 'eng' : value === 'chi_sim' ? 'chi_sim' : 'chi_sim+eng';
+const languageForRequest = (value, languages = []) => {
+  const available = new Set(languages);
+  if (value === 'eng') return 'eng';
+  if (value === 'chi_sim') return 'chi_sim';
+  if (value === 'auto') {
+    if (available.has('chi_sim') && available.has('eng')) return 'chi_sim+eng';
+    if (available.has('eng')) return 'eng';
+    if (available.has('chi_sim')) return 'chi_sim';
+    return 'eng';
+  }
+  if (value === 'chi_sim+eng') {
+    if (available.has('chi_sim') && available.has('eng')) return 'chi_sim+eng';
+    if (available.has('chi_sim')) return 'chi_sim';
+    return 'eng';
+  }
+  if (available.has('chi_sim') && available.has('eng')) return 'chi_sim+eng';
+  return available.has('chi_sim') ? 'chi_sim' : 'eng';
+};
 const languageFiles = (language) => [...new Set(language.split('+').filter(Boolean).map((name) => `${name}.traineddata`))];
 const classifyOcrError = (error) => {
   const code = String(error?.code || '');
@@ -109,6 +129,9 @@ const resolveOcrEngine = async () => {
 const getOcrEngineStatus = async () => {
   const { engine, failure, statusLabel } = await resolveOcrEngine();
   const languages = engine && !failure ? await listEngineLanguages(engine) : [];
+  const hasEnglish = languages.includes('eng');
+  const hasChineseSimplified = languages.includes('chi_sim');
+  const languageWarnings = hasChineseSimplified || !engine || failure ? [] : [missingChineseLanguagePackWarning];
   return {
     available: Boolean(engine && !failure),
     engine: engine && !failure ? 'tesseract-cli' : 'manual-fallback',
@@ -120,7 +143,9 @@ const getOcrEngineStatus = async () => {
     portablePath: engine?.source === 'portable' && !failure ? engine.command : null,
     tessdataPath: engine?.tessdataDir && !failure ? engine.tessdataDir : null,
     languages,
-    error: failure?.message || ''
+    languageStatus: { eng: hasEnglish, chi_sim: hasChineseSimplified },
+    languageWarnings,
+    error: failure?.message || (!hasChineseSimplified && engine && !failure ? missingChineseLanguagePackWarning : '')
   };
 };
 const verifyLanguagePacks = async (engine, language) => {
@@ -202,26 +227,36 @@ const fieldDefinitions = {
   englishName: ['英文名','英文名称','English Name'],
   aliases: ['别名','代号','外号','Alias','Aliases'],
   summary: ['简介','概述','摘要','一句话简介','Summary'],
-  details: ['详情','设定','描述','背景','人物小传','说明','Details','Description','流程','任务流程','台词','对话'],
+  details: ['详情','设定','描述','背景','人物小传','说明','获得方式','使用场景','Details','Description','流程','任务流程','台词','对话'],
   tags: ['标签','关键词','Tags','Keywords'],
   status: ['状态','Status'],
   spoilerLevel: ['保密等级','剧透等级','机密等级','Spoiler','Spoiler Level'],
   sourceNotes: ['来源','备注','来源备注','Source','Source Notes'],
   gender: ['性别'], age: ['年龄'], nationality: ['国籍'], ethnicity: ['民族','族裔'], occupation: ['职业'], weapon: ['武器'], attribute: ['属性'],
   characterType: ['角色类型','人物类型'], characterArc: ['人物弧光','角色弧光'], currentTimelineStatus: ['当前状态','时间线状态'],
-  relatedFactionIds: ['所属帮派','所属组织','阵营','关联帮派','相关势力','涉及帮派','涉及组织'],
-  relatedDistrictIds: ['所属区域','活动区域','涉及区域'], relatedPoiIds: ['相关地点','常驻地点','涉及地点'], relatedStorylineIds: ['相关剧情','可用剧本','登场剧本'], relatedCharacterIds: ['关系人','相关角色','涉及角色','登场角色','关联角色'],
+  relatedFactionIds: ['所属帮派','所属组织','阵营','关联帮派','相关势力','关联势力','涉及帮派','涉及组织'],
+  relatedDistrictIds: ['所属区域','活动区域','涉及区域'], relatedPoiIds: ['相关地点','常驻地点','涉及地点','关联地点'], relatedStorylineIds: ['相关剧情','可用剧本','登场剧本','关联剧情'], relatedCharacterIds: ['关系人','相关角色','涉及角色','登场角色','关联角色'],
   factionCategory: ['帮派类型','组织类型','类型'], culturalRoot: ['文化根源','文化背景'], territoryDistrictIds: ['地盘','活动区域','势力范围'], headquartersPoiIds: ['总部','据点','总部地点'], coreBusiness: ['核心业务','业务','产业'], allies: ['盟友'], enemies: ['敌人','对手'], visualKeywords: ['视觉关键词','视觉风格','外观','视觉'], missionTypes: ['任务类型','任务方向'],
   districtType: ['区域类型'], atmosphere: ['氛围'], realWorldReference: ['现实参考','原型'], dominantFactions: ['主导势力'], keyPoiIds: ['重要地点'], storyUsage: ['叙事用途','剧情用途'],
   poiType: ['地点类型','类型'], districtId: ['所属区域'], location: ['地址','位置'], function: ['功能','用途'], owner: ['经营者','所有人','控制者'],
   storylineType: ['剧情类型','任务类型','类型'], background: ['背景','故事背景'], playerGoal: ['玩家目标','目标'], coreConflict: ['核心冲突','冲突'], endings: ['结局','分支','结果'], dialogueText: ['台词','对话'],
-  designAssetType: ['物件类型','设计资料类型','类型'], category: ['类别','分类'], narrativeConstraints: ['叙事限制'], doNotRevealYet: ['暂不透露','不可提前透露'],
+  designAssetType: ['类型','物件类型','道具类型','武器类型','载具类型','设计资料类型'], category: ['类别','分类'], narrativeConstraints: ['叙事限制'], doNotRevealYet: ['暂不透露','不可提前透露'],
 };
 const arrayFieldSet = new Set(['aliases','tags','sourceNotes','culturalRoot','territoryDistrictIds','headquartersPoiIds','coreBusiness','allies','enemies','visualKeywords','missionTypes','atmosphere','dominantFactions','keyPoiIds','storyUsage','relatedFactionIds','relatedDistrictIds','relatedPoiIds','relatedCharacterIds','relatedStorylineIds','endings','narrativeConstraints','doNotRevealYet']);
 const multiLineFields = new Set(['details','summary','sourceNotes','background','storyUsage','dialogueText']);
 const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/[\s:_：=\-\/]/g, '');
-const keywordToField = (key) => Object.entries(fieldDefinitions).find(([, keys]) => keys.some((candidate) => normalizeKey(candidate) === normalizeKey(key)))?.[0] || '';
-const isLikelyFieldKey = (value) => Boolean(keywordToField(value));
+const keywordToField = (key, targetType = '') => {
+  const normalized = normalizeKey(key);
+  if (normalized === '类型') {
+    if (targetType === 'pois') return 'poiType';
+    if (targetType === 'design-assets') return 'designAssetType';
+    if (targetType === 'storylines') return 'storylineType';
+    if (targetType === 'districts') return 'districtType';
+  }
+  if ((normalized === '用途' || normalized === '功能') && targetType === 'design-assets') return 'summary';
+  return Object.entries(fieldDefinitions).find(([, keys]) => keys.some((candidate) => normalizeKey(candidate) === normalized))?.[0] || '';
+};
+const isLikelyFieldKey = (value, targetType = '') => Boolean(keywordToField(value, targetType));
 const mapEnum = (field, raw, designType) => {
   const value = scalar(raw);
   const compact = normalizeKey(value);
@@ -279,7 +314,7 @@ const appendValue = (asset, field, raw, designType) => {
   else if (field === 'details' && asset.details) asset.details = [asset.details, scalar(mapped)].filter(Boolean).join('\n');
   else asset[field] = scalar(mapped);
 };
-const extractPairs = (text) => {
+const extractPairs = (text, targetType = '') => {
   const lines = String(text || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const pairs = [];
   const consumed = new Set();
@@ -293,13 +328,13 @@ const extractPairs = (text) => {
     const explicit = /^([^:：=]{1,32})\s*[:：=]\s*(.*)$/.exec(line);
     const spaced = explicit ? undefined : /^([^\s]{2,16}|[A-Za-z][A-Za-z\s]{1,24})\s{2,}(.+)$/.exec(line);
     const match = explicit || spaced;
-    if (match && isLikelyFieldKey(match[1])) {
+    if (match && isLikelyFieldKey(match[1], targetType)) {
       commit();
       current = { key: match[1].trim(), values: [String(match[2] || '').trim()].filter(Boolean), lines: [line] };
       consumed.add(line);
       continue;
     }
-    if (current && multiLineFields.has(keywordToField(current.key)) && !isLikelyFieldKey(line)) {
+    if (current && multiLineFields.has(keywordToField(current.key, targetType)) && !isLikelyFieldKey(line, targetType)) {
       current.values.push(line);
       current.lines.push(line);
       consumed.add(line);
@@ -321,11 +356,11 @@ const normalizeAsset = (targetType, value = {}) => {
 };
 const parseOcrText = ({ text, designType, file }) => {
   const config = typeById.get(designType) || typeById.get('other_design');
-  const { lines, pairs, consumed } = extractPairs(text);
+  const { lines, pairs, consumed } = extractPairs(text, config.targetType);
   const asset = { ...(config.defaults || {}) };
   const recognized = [];
   for (const pair of pairs) {
-    const field = keywordToField(pair.key);
+    const field = keywordToField(pair.key, config.targetType);
     if (!field) continue;
     appendValue(asset, field, pair.value, designType);
     recognized.push({ field, label: pair.key, value: pair.value });
@@ -336,6 +371,7 @@ const parseOcrText = ({ text, designType, file }) => {
   if (/classified|绝密/i.test(text)) asset.spoilerLevel = 'classified';
   else if (/机密|secret/i.test(text) || designType === 'boss') asset.spoilerLevel = 'secret';
   else asset.spoilerLevel = asset.spoilerLevel || 'internal';
+  const nameWasInferred = !asset.name && !asset.chineseName && !asset.englishName;
   if (!asset.name) asset.name = asset.chineseName || asset.englishName || path.basename(file.name || file.filename || 'OCR 草稿').replace(/\.[^.]+$/, '');
   const leftovers = unrecognized.join('\n').trim();
   if (!asset.summary && leftovers) asset.summary = leftovers.split(/\n/).slice(0, 2).join('\n').slice(0, 240);
@@ -345,7 +381,9 @@ const parseOcrText = ({ text, designType, file }) => {
   asset.status = 'draft';
   asset.primaryEvidenceId = file.id || file.filename;
   asset.sourceNotes = [...splitList(asset.sourceNotes), `Created from image OCR: ${file.name}`, 'OCR text reviewed by user'];
-  return { targetType: config.targetType, targetFile: assetFiles[config.targetType] || `${config.targetType}.json`, asset: normalizeAsset(config.targetType, asset), recognizedFields: recognized, unrecognizedText: leftovers, sourceWillBecomePrimaryEvidence: Boolean(file?.id), warnings: ['识别结果需要人工校对', 'OCR 结果不会直接入库，请在草稿区确认'] };
+  const warnings = ['识别结果需要人工校对', 'OCR 结果不会直接入库，请在草稿区确认'];
+  if (nameWasInferred) warnings.push('未识别到明确名称，已用文件名作为草稿名称，请确认。');
+  return { targetType: config.targetType, targetFile: assetFiles[config.targetType] || `${config.targetType}.json`, asset: normalizeAsset(config.targetType, asset), recognizedFields: recognized, unrecognizedText: leftovers, sourceWillBecomePrimaryEvidence: Boolean(file?.id), sourceFileName: file.name, parserMode: 'Image OCR', warnings };
 };
 const readOcr = async () => { await ensureJsonArrayFile(ocrResultsPath); return readJsonArray(ocrResultsPath); };
 const writeOcr = (records) => writeJsonArray(ocrResultsPath, records);
@@ -386,20 +424,26 @@ router.post('/run', async (req, res, next) => {
     const id = safeId(req.body?.fileId);
     const file = await findUpload(id);
     const { filePath } = await assertImage(file);
-    const requestedLanguage = String(req.body?.language || 'chi_sim+eng');
-    const language = languageForRequest(requestedLanguage === 'auto' ? 'chi_sim+eng' : requestedLanguage);
+    const requestedLanguage = String(req.body?.language || 'auto');
     const preprocess = ['original', 'contrast', 'grayscale'].includes(req.body?.preprocess) ? req.body.preprocess : 'original';
     const { engine, failure, statusLabel } = await resolveOcrEngine();
     if (!engine || failure?.category === 'missing-engine') {
-      await syncOcrFailure({ id, file, language, preprocess, engine: 'manual-fallback', error: manualFallbackError, status: 'manual_fallback' });
+      await syncOcrFailure({ id, file, language: requestedLanguage, preprocess, engine: 'manual-fallback', error: manualFallbackError, status: 'manual_fallback' });
       return res.status(503).json(buildRunFailure(manualFallbackError));
     }
     if (failure?.category === 'blocked') {
-      await syncOcrFailure({ id, file, language, preprocess, engine: 'manual-fallback', error: blockedError, status: 'manual_fallback' });
+      await syncOcrFailure({ id, file, language: requestedLanguage, preprocess, engine: 'manual-fallback', error: blockedError, status: 'manual_fallback' });
       return res.status(503).json(buildRunFailure(blockedError));
     }
 
-    await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: 'processing', text: '', language, preprocess, engine: engine.name, error: '' });
+    const availableLanguages = await listEngineLanguages(engine);
+    const language = languageForRequest(requestedLanguage, availableLanguages);
+    if (requestedLanguage === 'chi_sim' && !availableLanguages.includes('chi_sim')) {
+      const failed = await syncOcrFailure({ id, file, language: 'chi_sim', preprocess, engine: engine.name, error: missingChineseLanguagePackError, status: 'failed' });
+      return res.status(400).json({ ...failed, engineStatus: statusLabel, error: missingChineseLanguagePackError });
+    }
+
+    await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: 'processing', text: '', language, requestedLanguage, preprocess, engine: engine.name, error: '' });
     const canUseLanguage = await verifyLanguagePacks(engine, language);
     if (!canUseLanguage) {
       if (language.includes('chi_sim') && await verifyLanguagePacks(engine, 'eng')) {
@@ -426,7 +470,8 @@ router.post('/run', async (req, res, next) => {
     try {
       const result = await runTesseract(engine, filePath, language);
       const text = result.text.trim();
-      const record = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: text ? 'done' : 'failed', text, language, preprocess, confidence: undefined, engine: engine.name, error: text ? '' : emptyTextError, engineStatus: statusLabel });
+      const usedEnglishFallback = requestedLanguage === 'chi_sim+eng' && language === 'eng';
+      const record = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: text ? 'done' : 'failed', text, language, requestedLanguage, preprocess, confidence: undefined, engine: engine.name, error: text ? (usedEnglishFallback ? chineseFallbackWarning : '') : emptyTextError, engineStatus: statusLabel });
       await syncUploadOcr(id, { status: record.status, text: record.text, language, preprocess, confidence: record.confidence, engine: record.engine, error: record.error, updatedAt: record.updatedAt });
       return res.json({ ...record, engineStatus: statusLabel });
     } catch (error) {
