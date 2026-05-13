@@ -96,7 +96,7 @@ npm run build
 
 ### Assets
 
-- `GET /api/assets`：读取 `data/factions.json`、`data/districts.json`、`data/pois.json`、`data/characters.json`、`data/storylines.json`、`data/pitches.json`
+- `GET /api/assets`：读取 `data/factions.json`、`data/districts.json`、`data/pois.json`、`data/characters.json`、`data/storylines.json`、`data/design-assets.json`、`data/pitches.json`
 - `GET /api/assets/:type`：读取指定类型资料
 - `POST /api/assets/:type`：新增资料，写入对应 JSON 文件
 - `PUT /api/assets/:type/:id`：更新资料，写回对应 JSON 文件
@@ -109,6 +109,7 @@ npm run build
 - `pois`
 - `characters`
 - `storylines`
+- `design-assets`
 - `pitches`
 
 ### Uploads
@@ -212,3 +213,51 @@ npm run dev:client
 语言映射为：中英混合 `chi_sim+eng`、中文 `chi_sim`、英文 `eng`。如果中文语言包不可用，系统会尝试使用英文识别，并在 OCR 面板提示“中文语言包不可用，已尝试英文识别。”
 
 如果公司安全策略不允许运行本地 `exe`，OCR 面板会显示中文提示，现有“手动粘贴识别文本 → 保存文本 → 用文本生成草稿”的流程仍可继续使用。
+
+### Portable OCR 中文语言包说明
+
+v0.5.4 起，项目内 portable OCR 会单独检测英文与简体中文语言包。推荐目录结构如下：
+
+```text
+tools/ocr/tesseract/
+  tesseract.exe
+  tessdata/
+    eng.traineddata
+    chi_sim.traineddata
+```
+
+说明：
+
+- `eng.traineddata` 用于英文识别。
+- `chi_sim.traineddata` 用于简体中文识别。
+- 如果只放 `eng.traineddata`，英文 OCR 可用，中文 OCR 不可用；`/api/ocr/status` 会提示“未检测到简体中文语言包 chi_sim.traineddata，中文识别可能不可用。”
+- 公司电脑无法安装 OCR 时，可以直接复制整个 `tools/ocr/tesseract` 文件夹到项目相同位置，然后重启 `npm run dev:server`。
+- OCR 语言选择规则：自动会在 `chi_sim` 与 `eng` 都存在时使用 `chi_sim+eng`，只有英文包时使用 `eng`；中文会要求 `chi_sim`；中英混合优先 `chi_sim+eng`，中文包缺失时 fallback 到 `eng` 并提示用户。
+
+### OCR 测试建议
+
+先测英文：
+
+```text
+Name: OCR Test Character
+Occupation: Driver
+Summary: This is a test character.
+```
+
+再测中文：
+
+```text
+姓名：OCR测试角色
+职业：出租车司机
+简介：这是一个 OCR 测试角色。
+```
+
+最后测真实素材：
+
+- 角色设定图
+- POI 设定图
+- 区域设定图
+- 物件 / 武器 / 载具图
+- 中英混排设定图
+
+OCR 结果需要人工校对，不能直接入库；请在 OCR 文本编辑器中校对、可选“清洗文本”，再生成 Parsed Draft 并到解析草稿区确认。
