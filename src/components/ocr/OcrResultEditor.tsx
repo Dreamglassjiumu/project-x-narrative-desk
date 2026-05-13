@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { IntakeDraft, OcrDesignType, OcrDraftPreview, OcrResult, UploadedFileRecord } from '../../utils/api';
-import { archiveErrorMessage, createOcrDraft, getOcrEngineStatus, getOcrResult, listOcrDesignTypes, previewOcrDraft, runOcr, saveOcrText } from '../../utils/api';
+import { ApiError, archiveErrorMessage, createOcrDraft, getOcrEngineStatus, getOcrResult, listOcrDesignTypes, previewOcrDraft, runOcr, saveOcrText } from '../../utils/api';
 import type { ArchiveNotifier } from '../ui/ArchiveNotice';
 
 const languageOptions = [
@@ -11,6 +11,7 @@ const languageOptions = [
 ];
 const statusLabel: Record<string, string> = { none: '未识别', queued: '排队中', processing: '识别中', done: '识别完成', failed: '识别失败', manual: '手动文本', manual_fallback: '手动识别文本' };
 const isImage = (file: UploadedFileRecord) => file.folder === 'images' || file.type?.startsWith('image/');
+const fallbackStatusFromError = (message: string) => message.includes('权限') || message.includes('安全策略') || message.includes('拦截') ? 'OCR 被系统拦截，可手动粘贴' : 'OCR 不可用，可手动粘贴';
 
 export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { file: UploadedFileRecord; apiOnline: boolean; notify?: ArchiveNotifier; onDraftCreated?: (draft: IntakeDraft) => void }) {
   const [ocr, setOcr] = useState<OcrResult>({ sourceFileId: file.id, sourceFileName: file.name, status: 'none', text: '' });
@@ -31,7 +32,7 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     let cancelled = false;
     setHasRunAttempt(false);
     void getOcrResult(file.id).then((result) => { if (!cancelled) { setOcr(result); setText(result.text || ''); setLanguage(result.language || 'chi_sim+eng'); setPreprocess(result.preprocess || 'original'); if (result.engineStatus || result.statusLabel) setEngineStatus(result.engineStatus || result.statusLabel || 'OCR 不可用，可手动粘贴'); } }).catch(() => undefined);
-    void getOcrEngineStatus().then((status) => { if (!cancelled) setEngineStatus(status.statusLabel || 'OCR 不可用，可手动粘贴'); }).catch(() => { if (!cancelled) setEngineStatus('OCR 不可用，可手动粘贴'); });
+    void getOcrEngineStatus().then((status) => { if (!cancelled) setEngineStatus(status.statusLabel || status.message || 'OCR 不可用，可手动粘贴'); }).catch(() => { if (!cancelled) setEngineStatus('OCR 不可用，可手动粘贴'); });
     void listOcrDesignTypes().then((items) => { if (!cancelled) setTypes(items); }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [apiOnline, file.id]);
@@ -50,7 +51,10 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
       notify?.({ tone: result.status === 'done' ? 'success' : 'info', title: result.status === 'done' ? 'OCR 识别完成' : friendly, detail: result.status === 'done' ? file.name : undefined });
     } catch (error) {
       const friendly = archiveErrorMessage(error, 'OCR 请求失败，请检查本地服务。');
-      setOcr((current) => ({ ...current, status: 'failed', error: friendly }));
+      const engineLabel = fallbackStatusFromError(friendly);
+      const body = error instanceof ApiError && typeof error.body === 'object' && error.body ? error.body as { engine?: string; status?: string; error?: string } : undefined;
+      setEngineStatus(engineLabel);
+      setOcr((current) => ({ ...current, status: body?.status === 'failed' ? 'failed' : current.status, engine: body?.engine || 'manual-fallback', engineStatus: engineLabel, statusLabel: engineLabel, error: friendly }));
       setMessage(friendly);
       notify?.({ tone: 'error', title: friendly });
     } finally { runningRef.current = false; setBusy(false); }
