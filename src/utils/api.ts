@@ -47,6 +47,18 @@ export const emptyAssetBundle: AssetBundle = {
 
 import { translateArchiveMessage } from '../i18n/zhCN';
 
+export class ApiError extends Error {
+  status: number;
+  body?: unknown;
+
+  constructor(message: string, status: number, body?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.body = body;
+  }
+}
+
 export function archiveErrorMessage(error: unknown, fallback = '写入失败。') {
   const message = error instanceof Error ? error.message : String(error || fallback);
   if (message.includes('Failed to fetch') || message.includes('NetworkError')) return translateArchiveMessage('Local API offline');
@@ -60,7 +72,8 @@ const requestJson = async <T>(input: RequestInfo | URL, init?: RequestInit): Pro
   const response = await fetch(input, init);
   if (!response.ok) {
     const body = await response.json().catch(() => undefined);
-    throw new Error(body?.error ?? `${response.status} ${response.statusText}`);
+    const message = typeof body === 'object' && body && 'error' in body ? String((body as { error?: unknown }).error || `${response.status} ${response.statusText}`) : `${response.status} ${response.statusText}`;
+    throw new ApiError(message, response.status, body);
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -112,7 +125,7 @@ export const upsertPitch = (pitch: Partial<SavedPitch> & PitchDraft) => {
 export const deletePitch = (id: string) => deleteAsset('pitches' as AssetType, id);
 
 
-export type OcrStatus = 'none' | 'queued' | 'processing' | 'done' | 'failed' | 'manual';
+export type OcrStatus = 'none' | 'queued' | 'processing' | 'done' | 'failed' | 'manual' | 'manual_fallback';
 export interface OcrResult { sourceFileId: string; sourceFileName?: string; status: OcrStatus; text: string; language?: string; confidence?: number; engine?: string; createdAt?: string; updatedAt?: string; error?: string; }
 export interface OcrDesignType { id: string; label: string; targetType: AssetType; }
 export const listOcrDesignTypes = () => requestJson<OcrDesignType[]>('/api/ocr/types');

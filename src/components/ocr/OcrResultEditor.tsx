@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { IntakeDraft, OcrDesignType, OcrResult, UploadedFileRecord } from '../../utils/api';
-import { archiveErrorMessage, createOcrDraft, getOcrResult, listOcrDesignTypes, runOcr, saveOcrText } from '../../utils/api';
+import { ApiError, archiveErrorMessage, createOcrDraft, getOcrResult, listOcrDesignTypes, runOcr, saveOcrText } from '../../utils/api';
 import type { ArchiveNotifier } from '../ui/ArchiveNotice';
+
+const manualFallbackMessage = '本地 OCR 引擎不可用，请手动粘贴识别文本。';
 
 const languageOptions = [
   { value: 'chi_sim+eng', label: '中英混合' },
@@ -9,7 +11,7 @@ const languageOptions = [
   { value: 'chi_sim', label: '中文' },
   { value: 'eng', label: '英文' },
 ];
-const statusLabel: Record<string, string> = { none: '未识别', queued: '排队中', processing: '识别中', done: '识别完成', failed: '识别失败', manual: '手动文本' };
+const statusLabel: Record<string, string> = { none: '未识别', queued: '排队中', processing: '识别中', done: '识别完成', failed: '识别失败', manual: '手动文本', manual_fallback: '手动识别文本' };
 const isImage = (file: UploadedFileRecord) => file.folder === 'images' || file.type?.startsWith('image/');
 
 export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { file: UploadedFileRecord; apiOnline: boolean; notify?: ArchiveNotifier; onDraftCreated?: (draft: IntakeDraft) => void }) {
@@ -19,48 +21,55 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
   const [designType, setDesignType] = useState('other_design');
   const [types, setTypes] = useState<OcrDesignType[]>([]);
   const [busy, setBusy] = useState(false);
+  const [hasRunAttempt, setHasRunAttempt] = useState(false);
+  const runningRef = useRef(false);
   const [message, setMessage] = useState('OCR 结果不会直接入库，请在草稿区确认。');
   const [preview, setPreview] = useState<{ recognizedFields: Array<{ field: string; label: string; value: string }>; unrecognizedText: string; warnings: string[] } | null>(null);
 
   useEffect(() => {
     if (!apiOnline) return;
     let cancelled = false;
+    setHasRunAttempt(false);
     void getOcrResult(file.id).then((result) => { if (!cancelled) { setOcr(result); setText(result.text || ''); setLanguage(result.language || 'chi_sim+eng'); } }).catch(() => undefined);
     void listOcrDesignTypes().then((items) => { if (!cancelled) setTypes(items); }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [apiOnline, file.id]);
 
   const run = async () => {
+    if (runningRef.current) return;
     if (!apiOnline || !isImage(file)) { setMessage('当前文件不是图片，无法 OCR。'); return; }
+    runningRef.current = true;
+    setHasRunAttempt(true);
     setBusy(true); setMessage('识别中 · 请等待本地 OCR 引擎处理，结果需要人工校对。');
     try {
       const result = await runOcr({ fileId: file.id, language });
       setOcr(result); setText(result.text || ''); setMessage(result.text ? '识别完成。请先校对识别文本，再生成草稿。' : result.error || '没有识别到文字。');
       notify?.({ tone: 'success', title: 'OCR 识别完成', detail: file.name });
     } catch (error) {
-      const friendly = archiveErrorMessage(error, '本地 OCR 引擎不可用，请手动粘贴识别文本。');
-      setOcr((current) => ({ ...current, status: 'failed', error: friendly })); setMessage(friendly); notify?.({ tone: 'info', title: friendly });
-    } finally { setBusy(false); }
+      const isManualFallback = error instanceof ApiError && error.status === 503;
+      const friendly = isManualFallback ? manualFallbackMessage : archiveErrorMessage(error, 'OCR 请求失败，请检查本地服务。');
+      setOcr((current) => ({ ...current, status: isManualFallback ? 'manual_fallback' : 'failed', engine: isManualFallback ? 'manual-fallback' : current.engine, error: friendly }));
+      setMessage(friendly);
+      notify?.({ tone: isManualFallback ? 'info' : 'error', title: friendly });
+    } finally { runningRef.current = false; setBusy(false); }
   };
   const save = async () => {
     if (!apiOnline) return;
     setBusy(true);
-    try { const result = await saveOcrText(file.id, { text, language, status: text.trim() ? 'manual' : 'none' }); setOcr(result); setMessage('识别文本已保存。请继续选择资料类型并生成草稿。'); notify?.({ tone: 'success', title: '识别文本已保存。' }); }
+    try { const result = await saveOcrText(file.id, { text, language, status: text.trim() ? 'manual' : 'none' }); setOcr(result); setMessage('识别文本已保存。'); notify?.({ tone: 'success', title: '识别文本已保存。' }); }
     catch (error) { const friendly = archiveErrorMessage(error, '保存识别文本失败。'); setMessage(friendly); notify?.({ tone: 'error', title: friendly }); }
     finally { setBusy(false); }
   };
   const makeDraft = async () => {
-    if (!text.trim()) { setMessage('请先保存识别文本。'); return; }
+    if (!text.trim()) { setMessage('请先输入识别文本。'); return; }
     if (!designType) { setMessage('请选择资料类型。'); return; }
     setBusy(true);
     try {
-      const saved = await saveOcrText(file.id, { text, language, status: 'manual' });
-      setOcr(saved);
       const result = await createOcrDraft({ fileId: file.id, text, designType });
       setPreview({ recognizedFields: result.recognizedFields, unrecognizedText: result.unrecognizedText, warnings: result.warnings });
       onDraftCreated?.(result.draft);
-      setMessage('已生成 Parsed Draft。OCR 结果不会直接入库，请在草稿区确认。');
-      notify?.({ tone: 'success', title: 'OCR 文本已生成待确认草稿', detail: `${result.draft.asset.name} · ${result.targetType}` });
+      setMessage('草稿已生成，请到解析草稿区确认。');
+      notify?.({ tone: 'success', title: '草稿已生成，请到解析草稿区确认。', detail: `${result.draft.asset.name} · ${result.targetType}` });
     } catch (error) { const friendly = archiveErrorMessage(error, '生成草稿失败。'); setMessage(friendly); notify?.({ tone: 'error', title: friendly }); }
     finally { setBusy(false); }
   };
@@ -83,9 +92,9 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
       <label className="mt-3 block"><span className="field-label">识别文本 · 手动粘贴识别文本</span><textarea className="paper-input min-h-44" value={text} onChange={(e) => setText(e.target.value)} placeholder="本地 OCR 引擎不可用时，请手动粘贴识别文本。" /></label>
       <p className="mt-2 border border-brass/20 bg-brass/10 p-2 text-xs text-walnut/75">请先校对识别文本，再生成草稿。{message}</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button className="stamp border-brass text-brass disabled:opacity-50" disabled={!apiOnline || busy} onClick={() => void run()}>{ocr.text ? '重新识别' : '识别文字'}</button>
+        <button className="stamp border-brass text-brass disabled:opacity-50" disabled={!apiOnline || busy} onClick={() => void run()}>{ocr.text || hasRunAttempt ? '重新识别' : '识别文字'}</button>
         <button className="stamp border-brass text-brass disabled:opacity-50" disabled={!apiOnline || busy} onClick={() => void save()}>保存文本</button>
-        <button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!apiOnline || busy} onClick={() => void makeDraft()}>用文本生成草稿</button>
+        <button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!apiOnline || busy || !text.trim()} onClick={() => void makeDraft()}>用文本生成草稿</button>
         <button className="stamp border-paper/70 text-paper disabled:opacity-50" disabled={!text} onClick={() => void navigator.clipboard?.writeText(text)}>复制文本</button>
         <button className="stamp border-walnut text-walnut" onClick={() => setText('')}>清空文本</button>
       </div>
