@@ -13,6 +13,7 @@ import { EvidenceCreateDossierDialog } from './EvidenceCreateDossierDialog';
 import { EvidenceUsageBadge, fileUsageOptions } from './EvidenceUsageBadge';
 import { EvidenceLightbox } from '../evidence/EvidenceLightbox';
 import { fileUsageLabel, zh } from '../../i18n/zhCN';
+import { clipboardImageFromEvent, clipboardPlainTextFromEvent, isEditablePasteTarget, mergeUploadedIntoFiles, notifyClipboardError, uploadClipboardScreenshot } from '../../utils/clipboardEvidence';
 
 const formatSize = (size: number) => size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / 1024 / 1024).toFixed(2)} MB`;
 const evidenceFolder = (file: UploadedFileRecord) => `uploads/${file.folder ?? 'documents'}`;
@@ -33,6 +34,9 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
   const [usageFilter, setUsageFilter] = useState('');
   const [linkFilter, setLinkFilter] = useState<'all' | 'linked' | 'unlinked'>('all');
   const [lightboxFile, setLightboxFile] = useState<UploadedFileRecord | null>(null);
+  const [lightboxOcrOpen, setLightboxOcrOpen] = useState(false);
+  const [waitingForScreenshot, setWaitingForScreenshot] = useState(false);
+  const [recentScreenshotId, setRecentScreenshotId] = useState('');
   const [history, setHistory] = useState<ImportHistoryRecord[]>([]);
   useEffect(() => { if (apiOnline) void listImportHistory().then(setHistory).catch(() => undefined); }, [apiOnline]);
   const assets = flattenAssets(bundle);
@@ -42,6 +46,36 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
   const importRecords = (file: UploadedFileRecord) => history.filter((item) => item.sourceFileId === file.id || item.sourceFileId === file.filename || item.sourceFileName === file.name || item.sourceFileName?.includes(file.name));
   const cleanFileTestDrafts = async (file: UploadedFileRecord) => { try { const result = await cleanIntakeDrafts({ mode: file.name.toLowerCase().includes('projectx_test') ? 'projectx_test' : 'source', sourceFileName: file.name, withBackup: true }); notify({ tone: 'success', title: '该文件草稿清理完成', detail: `清理 ${result.removed} 条草稿；uploads 原始文件保留。` }); } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, '草稿清理失败。') }); } };
   const toggleSelected = (id: string, checked: boolean) => setSelected((current) => checked ? [...new Set([...current, id])] : current.filter((item) => item !== id));
+
+  const openExternalOcrDesk = (file: UploadedFileRecord) => { setLightboxFile(file); setLightboxOcrOpen(true); setSelected([file.id]); };
+  const saveClipboardScreenshot = async (file: File) => {
+    if (!apiOnline) return;
+    setBusy(true);
+    try {
+      const uploaded = await uploadClipboardScreenshot(file);
+      onFilesChanged(mergeUploadedIntoFiles(uploaded, files));
+      setLastUploaded([uploaded]); setRecentScreenshotId(uploaded.id); setWaitingForScreenshot(false);
+      notify({ tone: 'success', title: '截图已保存为证物。', detail: '已打开外部 OCR 文本接收台。' });
+      openExternalOcrDesk(uploaded);
+    } catch (error) { notifyClipboardError(error, notify); }
+    finally { setBusy(false); }
+  };
+
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const image = clipboardImageFromEvent(event);
+      if (image) { event.preventDefault(); void saveClipboardScreenshot(image); return; }
+      const text = clipboardPlainTextFromEvent(event);
+      if (text && (waitingForScreenshot || lightboxOcrOpen) && recentScreenshotId && !isEditablePasteTarget(event.target)) {
+        const recent = files.find((file) => file.id === recentScreenshotId);
+        if (recent && window.confirm('是否将这段文本作为最近截图的识别文本？')) { event.preventDefault(); openExternalOcrDesk(recent); }
+      } else if (waitingForScreenshot && !isEditablePasteTarget(event.target)) {
+        notify({ tone: 'error', title: '剪贴板中没有图片。' });
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [apiOnline, files, lightboxOcrOpen, recentScreenshotId, waitingForScreenshot]);
 
   const onFiles = async (fileList: FileList | null) => {
     if (!fileList?.length) return;
@@ -83,6 +117,7 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
           <div className="mt-5 text-left"><TagChipInput label="上传标签" value={pendingTags} onChange={setPendingTags} placeholder="mugshot, concept, ledger" /></div>
           <select className="paper-input mt-3" value={pendingUsage} disabled={!apiOnline || busy} onChange={(e) => setPendingUsage(e.target.value)}>{fileUsageOptions.map((item) => <option key={item} value={item}>{fileUsageLabel(item)}</option>)}</select>
           <select multiple className="paper-input mt-3 min-h-40" value={pendingLinks} disabled={!apiOnline || busy} title={!apiOnline ? zh.disabledReadOnly : undefined} onChange={(e) => setPendingLinks(Array.from(e.currentTarget.selectedOptions).map((o) => o.value))}>{assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.category} · {asset.name}</option>)}</select>
+          <div className="mt-4 border border-brass/30 bg-brass/10 p-3 text-sm text-paper"><button type="button" className="stamp border-brass text-brass" onClick={() => setWaitingForScreenshot(true)}>粘贴截图</button><p className="mt-2">使用 Windows 截图或 Snipaste 后，回到这里按 Ctrl+V。</p>{waitingForScreenshot ? <p className="mt-2 font-bold text-brass">请按 Ctrl+V 粘贴截图。</p> : null}</div>
           <label className={`mt-6 inline-flex evidence-button ${busy || !apiOnline ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`} title={!apiOnline ? zh.disabledReadOnly : undefined}>{busy ? '正在保存证物…' : '选择证物文件'}<input ref={inputRef} type="file" multiple accept="image/*,.md,.markdown,.json,.txt,.pdf,.doc,.docx,.xls,.xlsx,.csv" className="hidden" disabled={busy || !apiOnline} onChange={(event) => void onFiles(event.target.files)} /></label>
           {lastUploaded.length ? <div className="mt-5 border border-teal/50 bg-police/40 p-3 text-left font-mono text-xs text-paper"><p className="type-label text-brass">最近保存的证物</p>{lastUploaded.map((file) => <p key={file.id} className="mt-2">{file.name} · {file.type || zh.unknown} · {formatSize(file.size)} · {evidenceFolder(file)}</p>)}</div> : null}
           {error ? <p className="mt-4 border border-crimson/50 bg-burgundy/45 p-3 font-mono text-xs text-paper">本地接口错误 · {error}</p> : null}
@@ -111,7 +146,7 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
                     <p className="mt-2 text-xs text-walnut/70">已绑定档案： {names.join(', ') || zh.none}</p><p className="text-xs text-walnut/70">主图用于： {primaryNames(file).join(', ') || zh.none}</p><div className="mt-2 border border-walnut/15 bg-paper/60 p-2 text-xs text-walnut/70"><p>此文件已导入过 {imports.reduce((sum, item) => sum + (item.filedCount || 0), 0)} 条档案</p>{imports.slice(0, 3).flatMap((item) => item.filedAssetNames || []).slice(0, 5).map((name) => <p key={name}>- {name}</p>)}<p>最近一次导入： {imports[0]?.createdAt ? new Date(imports[0].createdAt).toLocaleString() : zh.none}</p></div>
                   </div>
                   {file.folder === 'images' ? <button onClick={() => setLightboxFile(file)} className="h-24 w-24 shrink-0 border border-walnut/20 bg-paper p-1"><img src={file.url} alt={file.name} className="h-full w-full object-cover sepia" /></button> : null}<div className="flex shrink-0 flex-col gap-2">
-                    {file.folder === 'images' ? <button onClick={() => setLightboxFile(file)} disabled={busy || !apiOnline} className="stamp border-crimson text-crimson disabled:opacity-50">{file.ocr?.text ? '查看识别文本' : '识别文字'}</button> : null}
+                    {file.folder === 'images' ? <button onClick={() => openExternalOcrDesk(file)} disabled={busy || !apiOnline} className="stamp border-crimson text-crimson disabled:opacity-50">粘贴识别文本</button> : null}
                     {file.folder === 'images' && file.ocr?.text ? <button onClick={() => setLightboxFile(file)} disabled={busy || !apiOnline} className="stamp border-brass text-brass disabled:opacity-50">用识别文本建档</button> : null}
                     <button onClick={() => setCreatingFrom(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">建档</button>
                     <button onClick={() => setBinding(file)} disabled={busy || !apiOnline} title={!apiOnline ? zh.disabledReadOnly : undefined} className="stamp border-brass text-brass disabled:cursor-not-allowed disabled:opacity-50">绑定</button>
@@ -125,7 +160,7 @@ export function LocalLibraryPage({ bundle, files, apiOnline, onFilesChanged, onA
       </div>
       <EvidenceCreateDossierDialog file={creatingFrom} bundle={bundle} onClose={() => setCreatingFrom(undefined)} onCreated={onCreated} onError={(message) => notify({ tone: 'error', title: message })} />
       <FileBindDialog file={binding} bundle={bundle} onClose={() => setBinding(undefined)} onSave={(metadata) => void saveBinding(metadata)} />
-      {lightboxFile ? <EvidenceLightbox image={lightboxFile} imageList={visibleFiles.filter((file) => file.folder === 'images' || file.type?.startsWith('image/'))} initialIndex={Math.max(0, visibleFiles.filter((file) => file.folder === 'images' || file.type?.startsWith('image/')).findIndex((file) => file.id === lightboxFile.id))} assets={assets} onClose={() => setLightboxFile(null)} onBind={setBinding} apiOnline={apiOnline} notify={notify} /> : null}
+      {lightboxFile ? <EvidenceLightbox image={lightboxFile} imageList={visibleFiles.filter((file) => file.folder === 'images' || file.type?.startsWith('image/'))} initialIndex={Math.max(0, visibleFiles.filter((file) => file.folder === 'images' || file.type?.startsWith('image/')).findIndex((file) => file.id === lightboxFile.id))} assets={assets} onClose={() => { setLightboxFile(null); setLightboxOcrOpen(false); }} onBind={setBinding} apiOnline={apiOnline} notify={notify} initialShowOcr={lightboxOcrOpen} /> : null}
       <ConfirmDialog open={Boolean(deleting)} title="删除证物？" message={`此证物已绑定 ${deleting?.linkedAssetIds?.length ?? 0} 个档案。${(deleting?.linkedAssetIds?.length ?? 0) > 0 ? ' 已绑定档案：' + linkedNames(deleting as UploadedFileRecord).join(', ') : ''}`} confirmLabel="删除证物" onCancel={() => setDeleting(undefined)} onConfirm={() => void confirmDelete()} />
     </section>
   );
