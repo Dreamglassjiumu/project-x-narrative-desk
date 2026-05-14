@@ -12,6 +12,7 @@ import { SearchBox } from '../components/layout/SearchBox';
 import type { ArchiveNotifier } from '../components/ui/ArchiveNotice';
 import { ClassifiedBadge } from '../components/ui/ClassifiedBadge';
 import { StatusStamp } from '../components/ui/StatusStamp';
+import { categoryLabelZh } from '../i18n/zhCN';
 
 type LinkKey = 'linkedCharacterIds' | 'linkedFactionIds' | 'linkedDistrictIds' | 'linkedPoiIds' | 'linkedStorylineIds';
 type SaveStatus = 'autosaved' | 'unsaved' | 'saved' | 'offline';
@@ -91,13 +92,30 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
   const addToPitchLinks = (asset: AnyAsset) => {
     const key = linkKeyForAsset(asset);
     if (!key) return;
+    const alreadyLinked = draft[key].includes(asset.id);
+    if (alreadyLinked) {
+      notify({ tone: 'success', title: `${asset.name} 已在 Pitch 关联档案中。` });
+      return;
+    }
+    setDraft((current) => ({ ...current, [key]: [...current[key], asset.id] }));
+    if (apiOnline) setSaveStatus('unsaved');
+    notify({ tone: 'success', title: `${asset.name} 已添加到 Pitch 关联档案。` });
+  };
+
+  const appendToPitchBody = (text: string, notice: string) => {
     setDraft((current) => {
-      const currentIds = current[key];
-      if (currentIds.includes(asset.id)) return current;
-      return { ...current, [key]: [...currentIds, asset.id] };
+      const spacer = current.body.trim() ? '\n\n' : '';
+      return { ...current, body: `${current.body}${spacer}${text}` };
     });
     if (apiOnline) setSaveStatus('unsaved');
-    notify({ tone: 'success', title: `${asset.name} added to Pitch Links.` });
+    notify({ tone: 'success', title: notice });
+  };
+
+  const insertAssetName = (asset: AnyAsset) => appendToPitchBody(asset.name, `${asset.name} 已插入 Pitch 正文。`);
+
+  const insertAssetReference = (asset: AnyAsset) => {
+    const label = categoryLabelZh(asset.category);
+    appendToPitchBody(`【${label}】${asset.name}`, `${asset.name} 的引用片段已插入 Pitch。`);
   };
 
   const loadPitch = (pitch: SavedPitch) => {
@@ -212,7 +230,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
         <PitchEditor draft={draft} assets={bundle} onChange={updateDraft} />
       </main>
 
-      <PitchInsightPanel draft={draft} manualLinks={manualLinks} detected={detected} riskAssets={riskAssets} saveStatus={saveStatus} />
+      <PitchInsightPanel draft={draft} manualLinks={manualLinks} detected={detected} riskAssets={riskAssets} saveStatus={saveStatus} allAssets={assets} onInsertName={insertAssetName} onInsertReference={insertAssetReference} onAddToLinks={addToPitchLinks} />
       <ConfirmDialog open={confirmDelete} title="删除 Pitch？" message="此 Pitch 将从 data/pitches.json 中删除。" confirmLabel="删除 Pitch" onCancel={() => setConfirmDelete(false)} onConfirm={() => void remove()} />
     </div>
   );

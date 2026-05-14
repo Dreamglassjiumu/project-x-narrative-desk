@@ -41,7 +41,11 @@ export default function App() {
       if (detail?.view) setPage(detail.view);
     };
     window.addEventListener('projectx:navigate', onNavigate);
-    return () => window.removeEventListener('projectx:navigate', onNavigate);
+    window.addEventListener('projectx:open-dossier', onNavigate);
+    return () => {
+      window.removeEventListener('projectx:navigate', onNavigate);
+      window.removeEventListener('projectx:open-dossier', onNavigate);
+    };
   }, []);
 
   useEffect(() => {

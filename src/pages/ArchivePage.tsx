@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { AnyAsset } from '../data';
 import { AssetCard } from '../components/cards/AssetCard';
 import { DetailPanel } from '../components/detail/DetailPanel';
@@ -34,6 +34,16 @@ export function ArchivePage({ type, assets, bundle, files, query, eyebrow, title
   const [mergeTargetId, setMergeTargetId] = useState('');
   const [mergeMode, setMergeMode] = useState<'target' | 'source' | 'append'>('target');
   const selected = filtered.find((asset) => asset.id === selectedId) ?? filtered[0];
+
+  useEffect(() => {
+    const onOpenDossier = (event: Event) => {
+      const detail = (event as CustomEvent<{ assetId?: string }>).detail;
+      if (detail?.assetId && assets.some((asset) => asset.id === detail.assetId)) setSelectedId(detail.assetId);
+    };
+    window.addEventListener('projectx:open-dossier', onOpenDossier);
+    return () => window.removeEventListener('projectx:open-dossier', onOpenDossier);
+  }, [assets]);
+
   const categories = [...new Set(assets.map((asset) => asset.category).filter(Boolean))];
   const tags = [...new Set(assets.flatMap((asset) => asset.tags))];
 
