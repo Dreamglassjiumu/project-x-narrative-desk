@@ -36,6 +36,15 @@ export default function App() {
   };
 
   useEffect(() => {
+    const onNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<{ view?: PageKey }>).detail;
+      if (detail?.view) setPage(detail.view);
+    };
+    window.addEventListener('projectx:navigate', onNavigate);
+    return () => window.removeEventListener('projectx:navigate', onNavigate);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
     fetchAssetBundle()
       .then(async (bundle) => {
