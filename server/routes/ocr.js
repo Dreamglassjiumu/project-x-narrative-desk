@@ -294,7 +294,7 @@ const fieldDefinitions = {
   gender: ['性别'], age: ['年龄'], nationality: ['国籍'], ethnicity: ['民族','族裔'], occupation: ['职业'], weapon: ['武器'], attribute: ['属性'],
   characterType: ['角色类型','人物类型'], characterArc: ['人物弧光','角色弧光'], currentTimelineStatus: ['当前状态','时间线状态'],
   relatedFactionIds: ['所属帮派','所属组织','阵营','关联帮派','相关势力','关联势力','涉及帮派','涉及组织'],
-  relatedDistrictIds: ['所属区域','活动区域','涉及区域'], relatedPoiIds: ['相关地点','常驻地点','涉及地点','关联地点'], relatedStorylineIds: ['相关剧情','可用剧本','登场剧本','关联剧情'], relatedCharacterIds: ['关系人','相关角色','涉及角色','登场角色','关联角色'],
+  relatedDistrictIds: ['地区','所属区域','活动区域','涉及区域','关联区域'], relatedPoiIds: ['相关地点','常驻地点','涉及地点','关联地点'], relatedStorylineIds: ['相关剧情','可用剧本','登场剧本','登场剧情','关联剧情'], relatedCharacterIds: ['关系人','相关角色','涉及角色','登场角色','关联角色'],
   factionCategory: ['帮派类型','组织类型','类型'], culturalRoot: ['文化根源','文化背景'], territoryDistrictIds: ['地盘','活动区域','势力范围'], headquartersPoiIds: ['总部','据点','总部地点'], coreBusiness: ['核心业务','业务','产业'], allies: ['盟友'], enemies: ['敌人','对手'], visualKeywords: ['视觉关键词','视觉风格','外观','视觉'], missionTypes: ['任务类型','任务方向'],
   districtType: ['区域类型'], atmosphere: ['氛围'], realWorldReference: ['现实参考','原型'], dominantFactions: ['主导势力'], keyPoiIds: ['重要地点'], storyUsage: ['叙事用途','剧情用途'],
   poiType: ['地点类型','类型'], districtId: ['所属区域'], location: ['地址','位置'], function: ['功能','用途'], owner: ['经营者','所有人','控制者'],
@@ -439,10 +439,10 @@ const parseOcrText = ({ text, designType, file }) => {
   asset.category = asset.category || config.label;
   asset.status = 'draft';
   asset.primaryEvidenceId = file.id || file.filename;
-  asset.sourceNotes = [...splitList(asset.sourceNotes), `Created from image OCR: ${file.name}`, 'OCR text reviewed by user'];
+  asset.sourceNotes = [...splitList(asset.sourceNotes), 'Created from clipboard screenshot.', 'OCR text pasted by user.', 'External OCR source unknown or user provided.'];
   const warnings = ['识别结果需要人工校对', 'OCR 结果不会直接入库，请在草稿区确认'];
   if (nameWasInferred) warnings.push('未识别到明确名称，已用文件名作为草稿名称，请确认。');
-  return { targetType: config.targetType, targetFile: assetFiles[config.targetType] || `${config.targetType}.json`, asset: normalizeAsset(config.targetType, asset), recognizedFields: recognized, unrecognizedText: leftovers, sourceWillBecomePrimaryEvidence: Boolean(file?.id), sourceFileName: file.name, parserMode: 'Image OCR', warnings };
+  return { targetType: config.targetType, targetFile: assetFiles[config.targetType] || `${config.targetType}.json`, asset: normalizeAsset(config.targetType, asset), recognizedFields: recognized, unrecognizedText: leftovers, sourceWillBecomePrimaryEvidence: Boolean(file?.id), sourceFileName: file.name, parserMode: 'Clipboard Screenshot + External OCR Text', warnings };
 };
 const readOcr = async () => { await ensureJsonArrayFile(ocrResultsPath); return readJsonArray(ocrResultsPath); };
 const writeOcr = (records) => writeJsonArray(ocrResultsPath, records);
@@ -546,7 +546,8 @@ router.post('/draft', async (req, res, next) => {
     const designType = String(req.body?.designType || 'other_design');
     if (!typeById.has(designType)) return res.status(400).json({ error: '请选择资料类型。' });
     const parsed = parseOcrText({ text, designType, file });
-    const draft = { id: `draft-${crypto.randomUUID()}`, targetType: parsed.targetType, asset: parsed.asset, sourceFileId: file.id, sourceFileName: file.name, sourceFilePath: `uploads/${file.folder}/${file.filename}`, parserMode: 'Image OCR', status: 'needs_review', createdAt: now(), updatedAt: now(), ocrText: text, sourceOcrText: text, ocrPreview: { recognizedFields: parsed.recognizedFields, unrecognizedText: parsed.unrecognizedText, targetFile: parsed.targetFile, sourceWillBecomePrimaryEvidence: parsed.sourceWillBecomePrimaryEvidence, warnings: parsed.warnings } };
+    const draftAsset = normalizeAsset(parsed.targetType, { ...parsed.asset, ...(req.body?.asset && typeof req.body.asset === 'object' ? req.body.asset : {}) });
+    const draft = { id: `draft-${crypto.randomUUID()}`, targetType: parsed.targetType, asset: draftAsset, sourceFileId: file.id, sourceFileName: file.name, sourceFilePath: `uploads/${file.folder}/${file.filename}`, parserMode: 'Clipboard Screenshot + External OCR Text', status: 'needs_review', createdAt: now(), updatedAt: now(), ocrText: text, sourceOcrText: text, cleanedOcrText: String(req.body?.cleanedText || text).trim(), ocrPreview: { recognizedFields: parsed.recognizedFields, unrecognizedText: parsed.unrecognizedText, targetFile: parsed.targetFile, sourceWillBecomePrimaryEvidence: parsed.sourceWillBecomePrimaryEvidence, warnings: parsed.warnings } };
     await ensureJsonArrayFile(intakeDraftsPath);
     await writeJsonArray(intakeDraftsPath, [draft, ...(await readJsonArray(intakeDraftsPath))]);
     res.status(201).json({ draft, ...parsed });

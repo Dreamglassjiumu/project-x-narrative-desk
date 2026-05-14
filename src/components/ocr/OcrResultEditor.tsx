@@ -78,6 +78,7 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
   const [preprocess, setPreprocess] = useState('scale2');
   const [psmMode, setPsmMode] = useState('block');
   const [designType, setDesignType] = useState('other_design');
+  const [previewMode, setPreviewMode] = useState<'card' | 'mind'>('card');
   const [types, setTypes] = useState<OcrDesignType[]>([]);
   const [busy, setBusy] = useState(false);
   const [hasRunAttempt, setHasRunAttempt] = useState(false);
@@ -159,7 +160,7 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     if (!preview) return;
     setBusy(true);
     try {
-      const result = await createOcrDraft({ fileId: file.id, text, designType });
+      const result = await createOcrDraft({ fileId: file.id, text: ocr.text || cleanUndo || text, cleanedText: text, designType, asset: preview.asset });
       setPreview({ ...preview, ...result });
       onDraftCreated?.(result.draft);
       setMessage('草稿已写入 Parsed Drafts，请到解析草稿区确认。');
@@ -168,13 +169,18 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     finally { setBusy(false); }
   };
 
+
+  const updatePreviewAsset = (field: string, value: string) => {
+    setPreview((current) => current ? { ...current, asset: { ...current.asset, [field]: ['tags','relatedCharacterIds','relatedPoiIds','relatedFactionIds','relatedDistrictIds'].includes(field) ? value.split(/[，,、;；]/).map((item) => item.trim()).filter(Boolean) : value } } : current);
+  };
+  const previewAsset = preview?.asset || {};
   const selectedProviderStatus = providerStatuses.find((item) => item.id === provider);
   const tesseractChineseTip = (activeProvider === 'tesseract-cli' || provider === 'tesseract-cli') && (language === 'chi_sim' || language === 'chi_sim+eng' || language === 'auto');
 
   return (
     <section className="border border-brass/30 bg-espresso/10 p-3 text-espresso">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><p className="type-label text-crimson">图片文字识别 / OCR</p><h3 className="font-display text-xl">证物文字提取台</h3><p className="text-xs text-walnut/70">识别结果需要人工校对；OCR 结果不会直接入库。</p></div>
+        <div><p className="type-label text-crimson">外部 OCR 文本接收台</p><h3 className="font-display text-xl">粘贴识别文本</h3><p className="text-xs text-walnut/70">识别结果需要人工校对；OCR 结果不会直接入库。</p></div>
         <span className="stamp border-brass text-brass">{statusLabel[ocr.status] || ocr.status}</span>
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-[120px_1fr]">
@@ -188,7 +194,7 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
         <label><span className="field-label">识别版式</span><select className="paper-input" value={psmMode} onChange={(e) => setPsmMode(e.target.value)}>{psmOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label><span className="field-label">资料类型</span><select className="paper-input" value={designType} onChange={(e) => setDesignType(e.target.value)}>{types.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       </div>
-      <div className="mt-3 border border-brass/20 bg-paper/70 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-espresso">粘贴外部 OCR 文本</p><p className="text-xs text-walnut/75">如果本地 OCR 效果不好，可以使用外部 OCR 工具识别后，把文本粘贴到这里。后续字段解析和建档流程完全一致。</p></div><button className="stamp border-brass text-brass" type="button" onClick={() => setProvider('manual-fallback')}>切到手动粘贴</button></div><label className="mt-2 block"><span className="field-label">识别文本 · 外部 OCR / 手动粘贴</span><textarea className="paper-input min-h-44" value={text} onChange={(e) => { setText(e.target.value); setPreview(null); }} placeholder="可从 Windows 截图、Office、企业微信、飞书或其他公司工具复制 OCR 文本后粘贴到这里。" /></label></div>
+      <div className="mt-3 border border-brass/20 bg-paper/70 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-espresso">粘贴外部 OCR 文本</p><p className="text-xs text-walnut/75">可以使用 Windows 截图工具、Snipaste、Office、企业微信、飞书、钉钉或其他公司允许的工具提取文字，再粘贴到这里。</p></div><button className="stamp border-brass text-brass" type="button" onClick={() => setProvider('manual-fallback')}>切到手动粘贴</button></div><label className="mt-2 block"><span className="field-label">识别文本 · 外部 OCR / 手动粘贴</span><textarea className="paper-input min-h-44" value={text} onChange={(e) => { setText(e.target.value); setPreview(null); }} placeholder="可从 Windows 截图、Office、企业微信、飞书或其他公司工具复制 OCR 文本后粘贴到这里。" /></label></div>
       <p className="mt-2 border border-brass/20 bg-brass/10 p-2 text-xs text-walnut/75">中文复杂图建议使用 PaddleOCR 或外部 OCR 文本粘贴。自动推荐会按 PaddleOCR 本地服务 → PaddleOCR 命令行 → Tesseract → 手动粘贴 fallback。{selectedProviderStatus && provider !== 'auto' && !selectedProviderStatus.available ? '该 OCR 引擎不可用，请检查配置或改用手动粘贴。' : ''} {message}</p>
       {tesseractChineseTip ? <p className="mt-2 border border-crimson/30 bg-crimson/10 p-2 text-xs text-crimson">Tesseract 中文识别可能不稳定。复杂设定图建议使用 PaddleOCR 或粘贴外部 OCR 文本。</p> : null}
       {providerStatuses.length ? <div className="mt-2 grid gap-1 text-xs text-walnut/75 md:grid-cols-2">{providerStatuses.map((item) => <span key={item.id} className={item.available ? 'text-walnut/80' : 'text-walnut/50'}>{item.available ? '可用' : '不可用'} · {item.label}{item.message ? `：${item.message}` : ''}</span>)}</div> : null}
@@ -198,30 +204,21 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
         <button className="stamp border-brass text-brass disabled:opacity-50" disabled={!apiOnline || busy} onClick={() => void save()}>保存文本</button>
         <button className="stamp border-brass text-brass disabled:opacity-50" disabled={busy || !text.trim()} onClick={cleanText}>清洗文本</button>
         <button className="stamp border-brass text-brass disabled:opacity-50" disabled={busy || cleanUndo === null} onClick={undoClean}>撤销清洗</button>
-        <button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!apiOnline || busy || !text.trim()} onClick={() => void makeDraft()}>用文本生成草稿</button>
+        <button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!apiOnline || busy || !text.trim()} onClick={() => void makeDraft()}>分析为资料卡片</button>
         <button className="stamp border-paper/70 text-paper disabled:opacity-50" disabled={!text} onClick={() => void navigator.clipboard?.writeText(text)}>复制文本</button>
         <button className="stamp border-walnut text-walnut" onClick={() => setText('')}>清空文本</button>
       </div>
       <p className="mt-3 text-xs text-walnut/70">中文 OCR 建议使用清晰大字、白底黑字、中文模式。复杂设定图可先裁剪文字区域，识别后请人工校对。</p>
       {preview ? <div className="mt-3 border border-walnut/20 bg-paper/60 p-3 text-xs text-walnut/80">
-        <p className="font-bold text-espresso">草稿解析预览 · 尚未写入 Parsed Drafts</p>
-        <div className="mt-2 grid gap-1 md:grid-cols-2">
-          <span>目标资料类型：{preview.targetType}</span>
-          <span>目标数据文件：data/{preview.targetFile}</span>
-          <span>主证物图：{preview.sourceWillBecomePrimaryEvidence ? 'Approve & File 后设为 primaryEvidenceId' : '否'}</span>
-          <span>草稿名称：{String(preview.asset?.name || '未命名 OCR 草稿')}</span>
-          <span>sourceFileName：{preview.sourceFileName || file.name}</span>
-          <span>parserMode：{preview.parserMode || 'Image OCR'}</span>
-        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-espresso">资料卡片化预览 · 生成草稿前请确认</p><p>parserMode：{preview.parserMode || 'Clipboard Screenshot + External OCR Text'} · 主证物图：{preview.sourceWillBecomePrimaryEvidence ? 'Approve & File 后设为 primaryEvidenceId' : '否'}</p></div><div className="flex gap-2"><button className={`stamp ${previewMode === 'card' ? 'border-crimson text-crimson' : 'border-brass text-brass'}`} onClick={() => setPreviewMode('card')}>卡片视图</button><button className={`stamp ${previewMode === 'mind' ? 'border-crimson text-crimson' : 'border-brass text-brass'}`} onClick={() => setPreviewMode('mind')}>脑图视图</button></div></div>
+        {previewMode === 'card' ? <div className="mt-3 grid gap-3 lg:grid-cols-3">
+          <div className="border border-walnut/20 bg-paper p-2"><p className="font-bold text-espresso">当前截图 / 图片证物</p><img src={file.url} alt={file.name} className="mt-2 max-h-72 w-full object-contain sepia" /><p className="mt-2 break-all">来源图片：{file.name}</p></div>
+          <div className="grid gap-2 border border-walnut/20 bg-paper p-2"><p className="font-bold text-espresso">外部 OCR 文本</p><label>原始粘贴文本<textarea className="paper-input min-h-28" value={ocr.text || cleanUndo || text} readOnly /></label><label>清洗后文本<textarea className="paper-input min-h-28" value={text} onChange={(e) => setText(e.target.value)} /></label></div>
+          <div className="grid gap-2 border border-walnut/20 bg-paper p-2"><p className="font-bold text-espresso">资料卡片预览（可编辑）</p><label>资料类型<select className="paper-input" value={designType} onChange={(e) => setDesignType(e.target.value)}>{types.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label><label>名称<input className="paper-input" value={String(previewAsset.name || '')} onChange={(e) => updatePreviewAsset('name', e.target.value)} /></label><label>英文名<input className="paper-input" value={String(previewAsset.englishName || '')} onChange={(e) => updatePreviewAsset('englishName', e.target.value)} /></label><label>简介<textarea className="paper-input min-h-20" value={String(previewAsset.summary || '')} onChange={(e) => updatePreviewAsset('summary', e.target.value)} /></label><label>详情<textarea className="paper-input min-h-28" value={String(previewAsset.details || '')} onChange={(e) => updatePreviewAsset('details', e.target.value)} /></label><label>标签<input className="paper-input" value={Array.isArray(previewAsset.tags) ? previewAsset.tags.join('，') : String(previewAsset.tags || '')} onChange={(e) => updatePreviewAsset('tags', e.target.value)} /></label><label>关联角色<input className="paper-input" value={Array.isArray(previewAsset.relatedCharacterIds) ? previewAsset.relatedCharacterIds.join('，') : ''} onChange={(e) => updatePreviewAsset('relatedCharacterIds', e.target.value)} /></label><label>关联帮派<input className="paper-input" value={Array.isArray(previewAsset.relatedFactionIds) ? previewAsset.relatedFactionIds.join('，') : ''} onChange={(e) => updatePreviewAsset('relatedFactionIds', e.target.value)} /></label><label>关联区域<input className="paper-input" value={Array.isArray(previewAsset.relatedDistrictIds) ? previewAsset.relatedDistrictIds.join('，') : ''} onChange={(e) => updatePreviewAsset('relatedDistrictIds', e.target.value)} /></label><label>关联地点<input className="paper-input" value={Array.isArray(previewAsset.relatedPoiIds) ? previewAsset.relatedPoiIds.join('，') : ''} onChange={(e) => updatePreviewAsset('relatedPoiIds', e.target.value)} /></label><p>来源图片：{preview.sourceFileName || file.name}</p></div>
+        </div> : <div className="mt-3 grid gap-3 md:grid-cols-3"><div className="border-2 border-crimson bg-crimson/10 p-3 text-center font-display text-2xl text-espresso">{String(previewAsset.name || '未命名档案')}</div>{[['基本信息', `${preview.targetType} · ${String(previewAsset.englishName || '')}`], ['简介', String(previewAsset.summary || '待补充')], ['详情', String(previewAsset.details || '待补充').slice(0, 260)], ['关联角色', Array.isArray(previewAsset.relatedCharacterIds) ? previewAsset.relatedCharacterIds.join('，') : '无'], ['关联地点', Array.isArray(previewAsset.relatedPoiIds) ? previewAsset.relatedPoiIds.join('，') : '无'], ['关联势力', Array.isArray(previewAsset.relatedFactionIds) ? previewAsset.relatedFactionIds.join('，') : '无'], ['标签', Array.isArray(previewAsset.tags) ? previewAsset.tags.join('，') : '无'], ['来源', file.name]].map(([title, body]) => <div key={title} className="border border-brass/30 bg-paper p-3"><p className="font-bold text-espresso">{title}</p><p className="mt-1 whitespace-pre-wrap">{body}</p></div>)}</div>}
         {preview.warnings?.length ? <p className="mt-2 text-crimson">提示：{preview.warnings.join(' / ')}</p> : null}
-        <p className="mt-2 font-bold">已识别字段</p>
-        <ul className="list-disc pl-5">{preview.recognizedFields.length ? preview.recognizedFields.map((item, index) => <li key={`${item.field}-${index}`}>{item.label} → {item.field}: {item.value}</li>) : <li>暂无明确字段，请返回修改文本。</li>}</ul>
-        <p className="mt-2 font-bold">未识别文本 / 需人工确认</p><pre className="whitespace-pre-wrap">{preview.unrecognizedText || '无'}</pre>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={busy} onClick={() => void confirmDraft()}>确认生成草稿</button>
-          <button className="stamp border-brass text-brass disabled:opacity-50" disabled={busy} onClick={() => setPreview(null)}>返回修改文本</button>
-          <button className="stamp border-walnut text-walnut disabled:opacity-50" disabled={busy} onClick={() => { setPreview(null); setMessage('已取消草稿生成。'); }}>取消</button>
-        </div>
+        <details className="mt-2"><summary className="font-bold">字段解析明细</summary><ul className="list-disc pl-5">{preview.recognizedFields.length ? preview.recognizedFields.map((item, index) => <li key={`${item.field}-${index}`}>{item.label} → {item.field}: {item.value}</li>) : <li>暂无明确字段，请返回修改文本。</li>}</ul><p className="mt-2 font-bold">未识别文本 / 已进入详情</p><pre className="whitespace-pre-wrap">{preview.unrecognizedText || '无'}</pre></details>
+        <div className="mt-3 flex flex-wrap gap-2"><button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={busy || !text.trim()} onClick={() => void confirmDraft()}>确认生成草稿</button><button className="stamp border-brass text-brass disabled:opacity-50" disabled={busy} onClick={() => setPreview(null)}>返回修改文本</button><button className="stamp border-walnut text-walnut disabled:opacity-50" disabled={busy} onClick={() => { setPreview(null); setMessage('已取消草稿生成。'); }}>取消</button></div>
       </div> : null}
     </section>
   );

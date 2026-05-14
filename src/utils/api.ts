@@ -101,12 +101,14 @@ export const deleteAsset = (type: AssetType, id: string) =>
 
 export const listUploads = () => requestJson<UploadedFileRecord[]>('/api/uploads');
 
-export const uploadFiles = async (files: FileList | File[], metadata?: { tags?: string[]; linkedAssetIds?: string[]; fileUsage?: string }) => {
+export const uploadFiles = async (files: FileList | File[], metadata?: { tags?: string[]; linkedAssetIds?: string[]; fileUsage?: string; note?: string; caption?: string }) => {
   const formData = new FormData();
   Array.from(files).forEach((file) => formData.append('files', file));
   if (metadata?.tags) formData.append('tags', JSON.stringify(metadata.tags));
   if (metadata?.linkedAssetIds) formData.append('linkedAssetIds', JSON.stringify(metadata.linkedAssetIds));
   if (metadata?.fileUsage) formData.append('fileUsage', metadata.fileUsage);
+  if (metadata?.note) formData.append('note', metadata.note);
+  if (metadata?.caption) formData.append('caption', metadata.caption);
   return requestJson<UploadedFileRecord[]>('/api/uploads', { method: 'POST', body: formData });
 };
 
@@ -137,7 +139,7 @@ export const runOcr = (payload: { fileId: string; language?: string; preprocess?
 export const saveOcrText = (fileId: string, payload: { text: string; language?: string; status?: OcrStatus }) => requestJson<OcrResult>(`/api/ocr/${encodeURIComponent(fileId)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 export interface OcrDraftPreview { targetType: AssetType; targetFile: string; asset: Partial<AnyAsset>; recognizedFields: Array<{ field: string; label: string; value: string }>; unrecognizedText: string; sourceWillBecomePrimaryEvidence: boolean; sourceFileName?: string; parserMode?: string; warnings: string[]; }
 export const previewOcrDraft = (payload: { fileId: string; text?: string; designType: string }) => requestJson<OcrDraftPreview>('/api/ocr/draft/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-export const createOcrDraft = (payload: { fileId: string; text?: string; designType: string }) => requestJson<{ draft: IntakeDraft } & OcrDraftPreview>('/api/ocr/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+export const createOcrDraft = (payload: { fileId: string; text?: string; cleanedText?: string; designType: string; asset?: Partial<AnyAsset> }) => requestJson<{ draft: IntakeDraft } & OcrDraftPreview>('/api/ocr/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
 export const exportArchive = () => requestJson<ArchiveExport>('/api/backup/export');
 export const importArchive = (payload: ArchiveExport, mode: 'merge' | 'replace') =>
