@@ -283,7 +283,19 @@ WINOCR_LANG=zh-Hans
 
 未配置时，后端会默认尝试 `C:\Users\yinglong\winocr_test.ps1`。`/api/ocr/status` 只检测脚本是否存在，不会每次状态检测都实际 OCR。截图保存为 evidence 后，OCR 面板会在 Windows OCR 可用时显示“自动识别文字”；识别成功会填入“识别文本”文本框，失败不会清空已有文本，可继续手动粘贴。
 
-PowerShell 脚本需要向标准输出打印 JSON：
+PowerShell 脚本需要先把 stdout 设置为 UTF-8，并且只向标准输出打印 JSON（不要在 stdout 输出调试日志）：
+
+```powershell
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+
+# ...保持现有 Windows OCR 识别逻辑...
+
+$json = $output | ConvertTo-Json -Depth 8 -Compress
+[Console]::Out.WriteLine($json)
+```
+
+JSON 结构需要保留 `error` 字段，`text` 与 `lines[].text` 会由后端以 Buffer 方式读取，并在 UTF-8 出现替换字符时自动 fallback 到 GBK / CP936 解码：
 
 ```json
 {
