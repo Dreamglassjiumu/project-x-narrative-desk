@@ -262,18 +262,40 @@ Summary: This is a test character.
 
 OCR 结果需要人工校对，不能直接入库；请在 OCR 文本编辑器中校对、可选“清洗文本”，再生成 Parsed Draft 并到解析草稿区确认。
 
-## 可选：接入 PaddleOCR 提升中文识别质量
+## OCR Provider：Windows OCR、Tesseract 与可选 PaddleOCR
 
-v0.5.6 起，OCR 后端使用多 provider 架构，优先级为：
+v0.5.8 起，OCR 后端接入 Windows OCR PowerShell provider。当前公司环境的自动推荐优先级为：
 
-1. `paddleocr-http`：PaddleOCR 本地服务
-2. `paddleocr-cli`：PaddleOCR 命令行脚本
-3. `tesseract-cli`：项目内 portable Tesseract / `.env` / system PATH
-4. `manual-fallback`：手动粘贴外部 OCR 文本
+1. `winocr-powershell`：Windows OCR PowerShell 脚本，适合中文截图、设定图、公司电脑环境。
+2. `tesseract-cli`：项目内 portable Tesseract / `.env` / system PATH，适合英文、简单截图、白底黑字等轻量场景。
+3. `manual-fallback`：手动粘贴外部 OCR 文本。
 
-Tesseract 仍会保留，适合英文、简单截图、白底黑字等轻量场景；中文复杂设定图、长图、表格化设定卡建议优先使用 PaddleOCR。PaddleOCR 是可选能力：没有安装或没有配置时，项目仍会自动 fallback 到 Tesseract 或手动粘贴流程，不影响基本运行。
+PaddleOCR HTTP / CLI provider 仍保留为可选能力，但不作为当前公司环境默认优先。没有安装或没有配置任何本地 OCR 时，项目仍会 fallback 到手动粘贴流程，不影响基本运行。
 
-### 方式 A：PaddleOCR HTTP 本地服务
+### 方式 A：Windows OCR PowerShell
+
+如果公司电脑已有可用脚本，可在 `.env` 中配置：
+
+```env
+WINOCR_PS1=C:\Users\yinglong\winocr_test.ps1
+WINOCR_LANG=zh-Hans
+```
+
+未配置时，后端会默认尝试 `C:\Users\yinglong\winocr_test.ps1`。`/api/ocr/status` 只检测脚本是否存在，不会每次状态检测都实际 OCR。截图保存为 evidence 后，OCR 面板会在 Windows OCR 可用时显示“自动识别文字”；识别成功会填入“识别文本”文本框，失败不会清空已有文本，可继续手动粘贴。
+
+PowerShell 脚本需要向标准输出打印 JSON：
+
+```json
+{
+  "text": "...",
+  "lines": [
+    { "text": "..." }
+  ],
+  "error": ""
+}
+```
+
+### 方式 B：PaddleOCR HTTP 本地服务
 
 如果你已经在本机或内网工具目录中准备了 PaddleOCR 服务，可在 `.env` 中配置：
 
@@ -303,7 +325,7 @@ multipart/form-data:
 
 如果服务没有启动或不可访问，`/api/ocr/status` 会显示“未检测到 PaddleOCR 本地服务”，OCR 页面仍可继续使用 Tesseract 或手动粘贴。
 
-### 方式 B：PaddleOCR CLI 脚本
+### 方式 C：PaddleOCR CLI 脚本
 
 如果你准备的是本地脚本，可在 `.env` 中配置：
 
