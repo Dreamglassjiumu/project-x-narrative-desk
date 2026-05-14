@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { AnyAsset } from '../../data';
+import type { UploadedFileRecord } from '../../utils/api';
 import type { PitchDraft } from '../../utils/pitch';
 import { categoryLabelZh, spoilerLabel, statusLabel } from '../../i18n/zhCN';
 import { ClassifiedBadge } from '../ui/ClassifiedBadge';
@@ -56,19 +57,20 @@ function AutoLinkCard({ asset, index, onOpen }: { asset: AnyAsset; index: number
   );
 }
 
-export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, saveStatus, allAssets, onInsertName, onInsertReference, onAddToLinks }: {
+export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, saveStatus, allAssets, files, onInsertName, onInsertReference, onAddToLinks }: {
   draft: PitchDraft;
   manualLinks: AnyAsset[];
   detected: AnyAsset[];
   riskAssets: AnyAsset[];
   saveStatus: SaveStatus;
   allAssets: AnyAsset[];
+  files: UploadedFileRecord[];
   onInsertName: (asset: AnyAsset) => void;
   onInsertReference: (asset: AnyAsset) => void;
   onAddToLinks: (asset: AnyAsset) => void;
 }) {
-  const [activeIndex, setActiveIndex] = useState<number | undefined>();
-  const activeAsset = activeIndex === undefined ? undefined : detected[activeIndex];
+  const [activeAsset, setActiveAsset] = useState<AnyAsset | undefined>();
+  const activeIndex = activeAsset ? detected.findIndex((asset) => asset.id === activeAsset.id) : -1;
 
   return (
     <aside className="max-h-[calc(100vh-7rem)] overflow-y-auto border border-crimson/40 bg-espresso/80 p-4 shadow-dossier 2xl:sticky 2xl:top-24">
@@ -101,7 +103,7 @@ export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, sa
         </div>
         <div className="mt-3 max-h-[48vh] space-y-3 overflow-y-auto pr-1">
           {detected.length === 0 && <div className="border border-dashed border-brass/30 p-3 text-sm text-paper/60">暂无自动识别结果。</div>}
-          {detected.map((asset, index) => <AutoLinkCard key={asset.id} asset={asset} index={index} onOpen={setActiveIndex} />)}
+          {detected.map((asset, index) => <AutoLinkCard key={asset.id} asset={asset} index={index} onOpen={() => setActiveAsset(asset)} />)}
         </div>
       </section>
 
@@ -123,14 +125,16 @@ export function PitchInsightPanel({ draft, manualLinks, detected, riskAssets, sa
         <DossierDetailModal
           asset={activeAsset}
           allAssets={allAssets}
-          hasPrevious={Boolean(activeIndex && activeIndex > 0)}
-          hasNext={activeIndex !== undefined && activeIndex < detected.length - 1}
-          onPrevious={() => setActiveIndex((current) => current === undefined ? current : Math.max(0, current - 1))}
-          onNext={() => setActiveIndex((current) => current === undefined ? current : Math.min(detected.length - 1, current + 1))}
-          onClose={() => setActiveIndex(undefined)}
+          files={files}
+          hasPrevious={activeIndex > 0}
+          hasNext={activeIndex >= 0 && activeIndex < detected.length - 1}
+          onPrevious={() => setActiveAsset(activeIndex > 0 ? detected[activeIndex - 1] : activeAsset)}
+          onNext={() => setActiveAsset(activeIndex >= 0 && activeIndex < detected.length - 1 ? detected[activeIndex + 1] : activeAsset)}
+          onClose={() => setActiveAsset(undefined)}
           onInsertName={onInsertName}
           onInsertReference={onInsertReference}
           onAddToLinks={onAddToLinks}
+          onSwitchAsset={setActiveAsset}
         />
       ) : null}
     </aside>

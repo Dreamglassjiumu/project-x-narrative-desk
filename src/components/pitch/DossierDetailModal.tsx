@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react';
-import type { AnyAsset, Character, District, Faction, Poi, Storyline } from '../../data';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { AnyAsset, Character, DesignAsset, District, Faction, Poi, Storyline } from '../../data';
 import { assetTypeFor, type AssetType } from '../../utils/assetHelpers';
+import type { UploadedFileRecord } from '../../utils/api';
 import { categoryLabelZh, spoilerLabel, statusLabel } from '../../i18n/zhCN';
 import { ClassifiedBadge } from '../ui/ClassifiedBadge';
 import { StatusStamp } from '../ui/StatusStamp';
@@ -8,6 +9,7 @@ import { StatusStamp } from '../ui/StatusStamp';
 type DossierDetailModalProps = {
   asset: AnyAsset;
   allAssets: AnyAsset[];
+  files: UploadedFileRecord[];
   hasPrevious?: boolean;
   hasNext?: boolean;
   onPrevious?: () => void;
@@ -16,6 +18,7 @@ type DossierDetailModalProps = {
   onInsertName: (asset: AnyAsset) => void;
   onInsertReference: (asset: AnyAsset) => void;
   onAddToLinks: (asset: AnyAsset) => void;
+  onSwitchAsset?: (asset: AnyAsset) => void;
 };
 
 type DetailSection = {
@@ -51,11 +54,6 @@ const isPresent = (value: unknown, index: Map<string, AnyAsset>) => valueToText(
 
 const makeRows = (rows: Array<[string, unknown]>, index: Map<string, AnyAsset>) => rows.filter(([, value]) => isPresent(value, index));
 
-const pageForAsset = (asset: AnyAsset): AssetType => {
-  const type = assetTypeFor(asset);
-  return type === 'pois' ? 'districts' : type;
-};
-
 const primaryName = (asset: AnyAsset) => asset.name || asset.chineseName || asset.englishName || asset.id;
 
 const sectionsForAsset = (asset: AnyAsset, index: Map<string, AnyAsset>): DetailSection[] => {
@@ -63,13 +61,15 @@ const sectionsForAsset = (asset: AnyAsset, index: Map<string, AnyAsset>): Detail
     {
       title: '基本信息',
       rows: makeRows([
-        ['ID', asset.id],
+        ['档案类型', detailTypeLabels[assetTypeFor(asset)] ?? categoryLabelZh(asset.category)],
         ['名称', asset.name],
         ['中文名', asset.chineseName],
         ['英文名', asset.englishName],
+        ['ID', asset.id],
         ['别名', asset.aliases],
         ['状态', statusLabel(asset.status)],
-        ['保密等级', spoilerLabel(asset.spoilerLevel)],
+        ['剧透等级 / 保密等级', spoilerLabel(asset.spoilerLevel)],
+        ['标签', asset.tags],
       ], index),
     },
   ];
@@ -83,19 +83,21 @@ const sectionsForAsset = (asset: AnyAsset, index: Map<string, AnyAsset>): Detail
       ['所属帮派', character.factionId],
       ['所属区域', character.districtId],
       ['角色类型', character.characterType],
-      ['时间线状态', character.currentTimelineStatus],
+      ['关联剧情', character.relatedStorylineIds],
+      ['角色弧光', character.characterArc],
+      ['当前状态', character.currentTimelineStatus],
     ], index));
   }
 
   if ('factionCategory' in asset) {
     const faction = asset as Faction;
     base[0].rows.push(...makeRows([
-      ['类别', faction.factionCategory],
+      ['组织类型', faction.factionCategory],
       ['文化根源', faction.culturalRoot],
-      ['地盘 / 相关区域', faction.territoryDistrictIds],
+      ['地盘', faction.territoryDistrictIds],
       ['总部地点', faction.headquartersPoiIds],
     ], index));
-    base.push({ title: '势力关系', rows: makeRows([['盟友', faction.allies], ['敌人', faction.enemies], ['核心业务', faction.coreBusiness], ['任务类型', faction.missionTypes]], index) });
+    base.push({ title: '帮派专属字段', rows: makeRows([['核心业务', faction.coreBusiness], ['盟友', faction.allies], ['敌人', faction.enemies], ['关联角色', faction.relatedCharacterIds], ['关联区域', faction.relatedDistrictIds]], index) });
   }
 
   if ('atmosphere' in asset && !('poiTier' in asset)) {
@@ -103,6 +105,7 @@ const sectionsForAsset = (asset: AnyAsset, index: Map<string, AnyAsset>): Detail
     base[0].rows.push(...makeRows([
       ['区域类型', district.districtType],
       ['氛围', district.atmosphere],
+      ['现实参考', district.realWorldReference],
       ['主导势力', district.dominantFactions],
       ['重要地点', district.keyPoiIds],
       ['区域状态', district.districtStatus],
@@ -117,6 +120,9 @@ const sectionsForAsset = (asset: AnyAsset, index: Map<string, AnyAsset>): Detail
       ['地点等级', poi.poiTier],
       ['功能 / 用途', poi.function],
       ['控制者 / 经营者', poi.owner],
+      ['关联角色', poi.relatedCharacterIds],
+      ['关联帮派', poi.relatedFactionIds],
+      ['关联剧情', poi.relatedStorylineIds],
       ['地址参考', poi.addressReference],
       ['位置', poi.location],
     ], index));
@@ -125,13 +131,28 @@ const sectionsForAsset = (asset: AnyAsset, index: Map<string, AnyAsset>): Detail
   if ('storylineType' in asset) {
     const storyline = asset as Storyline;
     base[0].rows.push(...makeRows([
-      ['剧情线类型', storyline.storylineType],
+      ['类型', storyline.storylineType],
+      ['背景', storyline.background],
       ['幕', storyline.act],
       ['时间线', storyline.timeline ?? storyline.timelinePlacement],
       ['主要冲突', storyline.mainConflict],
       ['玩家目标', storyline.playerGoal],
-      ['结局状态', storyline.endingState],
+      ['涉及角色', storyline.relatedCharacterIds?.length ? storyline.relatedCharacterIds : storyline.relatedPlayableCharacters],
+      ['涉及地点', storyline.relatedPoiIds],
+      ['结局 / 分支', storyline.endings?.length ? storyline.endings : storyline.endingState],
       ['Pitch 状态', storyline.pitchStatus],
+    ], index));
+  }
+
+  if ('designAssetType' in asset) {
+    const design = asset as DesignAsset;
+    base[0].rows.push(...makeRows([
+      ['设计资料类型', design.designAssetType],
+      ['用途', design.summary],
+      ['外观 / 视觉', design.visualKeywords],
+      ['关联角色', design.relatedCharacterIds],
+      ['关联地点', design.relatedPoiIds],
+      ['关联剧情', design.relatedStorylineIds],
     ], index));
   }
 
@@ -148,19 +169,21 @@ const sectionsForAsset = (asset: AnyAsset, index: Map<string, AnyAsset>): Detail
         [relationLabels.relatedStorylineIds, asset.relatedStorylineIds],
       ], index),
     },
-    { title: '标签与备注', rows: makeRows([['标签', asset.tags], ['叙事限制', asset.narrativeConstraints], ['暂不公开', asset.doNotRevealYet], ['来源 / 备注', asset.sourceNotes]], index) },
+    { title: '标签与备注', rows: makeRows([['叙事限制', asset.narrativeConstraints], ['暂不公开', asset.doNotRevealYet], ['来源 / 备注', asset.sourceNotes]], index) },
   );
 
   return base.filter((section) => section.rows.length > 0);
 };
 
-export function DossierDetailModal({ asset, allAssets, hasPrevious, hasNext, onPrevious, onNext, onClose, onInsertName, onInsertReference, onAddToLinks }: DossierDetailModalProps) {
+export function DossierDetailModal({ asset, allAssets, files, hasPrevious, hasNext, onPrevious, onNext, onClose, onInsertName, onInsertReference, onAddToLinks, onSwitchAsset }: DossierDetailModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const assetIndex = useMemo(() => new Map(allAssets.map((item) => [item.id, item])), [allAssets]);
   const sections = useMemo(() => sectionsForAsset(asset, assetIndex), [asset, assetIndex]);
   const type = assetTypeFor(asset);
+  const [zoomedImage, setZoomedImage] = useState(false);
+  const primaryEvidence = files.find((file) => file.id === asset.primaryEvidenceId || file.filename === asset.primaryEvidenceId);
   const typeLabel = detailTypeLabels[type] ?? categoryLabelZh(asset.category);
 
   useEffect(() => {
@@ -195,9 +218,22 @@ export function DossierDetailModal({ asset, allAssets, hasPrevious, hasNext, onP
     };
   }, [onClose]);
 
-  const openFullDossier = () => {
-    window.dispatchEvent(new CustomEvent('projectx:open-dossier', { detail: { view: pageForAsset(asset), assetId: asset.id } }));
-    onClose();
+  const renderValue = (label: string, value: unknown) => {
+    const ids = Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && assetIndex.has(item)) : [];
+    if (ids.length > 0 && (label.includes('关联'))) {
+      return (
+        <div className="flex flex-wrap gap-2">
+          {ids.map((id) => {
+            const related = assetIndex.get(id);
+            if (!related) return null;
+            return onSwitchAsset ? (
+              <button key={id} type="button" className="tag-label border-brass/50 bg-paper/70 text-espresso transition hover:border-crimson hover:text-crimson" onClick={() => onSwitchAsset(related)}>{related.name}</button>
+            ) : <span key={id} className="tag-label border-brass/50 bg-paper/70 text-espresso">{related.name}</span>;
+          })}
+        </div>
+      );
+    }
+    return valueToText(value, assetIndex) || '暂无';
   };
 
   return (
@@ -230,6 +266,15 @@ export function DossierDetailModal({ asset, allAssets, hasPrevious, hasNext, onP
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-5">
+          <div className="mb-4 border border-walnut/20 bg-[#ead8b8]/55 p-4 shadow-card">
+            <h3 className="section-title border-b border-walnut/20 pb-2">主证物图</h3>
+            {primaryEvidence ? (
+              <button type="button" className="mt-3 block max-h-64 overflow-hidden border border-brass/40 bg-black/10 p-2 text-left transition hover:border-crimson focus:outline-none focus:ring-2 focus:ring-brass" onClick={() => setZoomedImage(true)} aria-label="放大主证物图">
+                <img src={primaryEvidence.url} alt={primaryEvidence.caption || primaryEvidence.name || asset.name} className="max-h-56 w-full object-contain" />
+                <span className="mt-2 block font-mono text-xs text-walnut/65">点击放大 · {primaryEvidence.name || primaryEvidence.filename}</span>
+              </button>
+            ) : <p className="mt-3 inline-block border border-dashed border-walnut/25 bg-paper/40 px-3 py-2 text-sm text-walnut/55">暂无主图</p>}
+          </div>
           <div className="grid gap-4">
             {sections.map((section) => (
               <section key={section.title} className="border border-walnut/20 bg-[#ead8b8]/55 p-4 shadow-card">
@@ -238,7 +283,7 @@ export function DossierDetailModal({ asset, allAssets, hasPrevious, hasNext, onP
                   {section.rows.map(([label, value]) => (
                     <div key={`${section.title}-${label}`} className={(label === 'Summary' || label === 'Details' || label.includes('备注')) ? 'md:col-span-2' : ''}>
                       <dt className="field-label">{label}</dt>
-                      <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-espresso/85">{valueToText(value, assetIndex) || '暂无'}</dd>
+                      <dd className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-espresso/85">{renderValue(label, value)}</dd>
                     </div>
                   ))}
                 </dl>
@@ -251,15 +296,20 @@ export function DossierDetailModal({ asset, allAssets, hasPrevious, hasNext, onP
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <p className="font-mono text-xs uppercase tracking-[0.16em] text-walnut/60">Esc / 点击遮罩 / 右上角均可关闭，内容区可滚动。</p>
             <div className="flex flex-wrap justify-end gap-2">
-              <button type="button" className="stamp border-walnut text-walnut" onClick={() => onInsertName(asset)}>插入名称</button>
+              <button type="button" className="stamp border-walnut text-walnut" onClick={() => onInsertName(asset)}>插入名称到 Pitch</button>
               <button type="button" className="stamp border-brass bg-brass/10 text-walnut" onClick={() => onInsertReference(asset)}>插入引用片段</button>
               <button type="button" className="stamp border-brass text-brass" onClick={() => onAddToLinks(asset)}>添加到关联档案</button>
-              <button type="button" className="stamp border-crimson text-crimson" onClick={openFullDossier}>查看完整档案</button>
               <button type="button" className="stamp border-walnut text-walnut" onClick={onClose}>关闭</button>
             </div>
           </div>
         </footer>
       </div>
+      {zoomedImage && primaryEvidence ? (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setZoomedImage(false); }}>
+          <button type="button" className="absolute right-4 top-4 border-2 border-paper px-3 py-2 font-mono text-xs font-black uppercase tracking-[0.18em] text-paper" onClick={() => setZoomedImage(false)}>× 关闭主图</button>
+          <img src={primaryEvidence.url} alt={primaryEvidence.caption || primaryEvidence.name || asset.name} className="max-h-[88vh] max-w-[92vw] object-contain shadow-noir" />
+        </div>
+      ) : null}
     </div>
   );
 }
