@@ -67,6 +67,14 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
   const [saving, setSaving] = useState(false);
 
   useEffect(() => setDraft(initial as unknown as Record<string, unknown>), [initial, open]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
   if (!open) return null;
 
   const set = (key: string, value: unknown) => setDraft((current) => ({ ...current, [key]: value }));
@@ -103,13 +111,13 @@ export function AssetFormDrawer({ open, type, asset, templateId, initialAsset, b
   );
 
   return (
-    <div className="fixed inset-0 z-[60] flex justify-end overflow-hidden bg-espresso/70 p-3 pt-20 backdrop-blur-sm md:p-6 md:pt-24">
-      <aside className="flex h-full max-h-[calc(100vh-6rem)] w-full max-w-3xl flex-col overflow-hidden border-l-4 border-brass bg-paper shadow-noir">
-        <div className="shrink-0 border-b border-brass/30 bg-paper/95 p-5 backdrop-blur md:p-6">
+    <div className="fixed inset-0 z-[60] flex justify-end overflow-y-auto overflow-x-visible bg-espresso/70 p-2 pt-16 backdrop-blur-sm sm:p-3 sm:pt-20 md:p-6 md:pt-24" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <aside className="flex h-[calc(100vh-4.5rem)] max-h-[calc(100vh-4.5rem)] w-full max-w-3xl flex-col overflow-hidden border-l-4 border-brass bg-paper shadow-noir md:h-full md:max-h-[calc(100vh-6rem)]" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="sticky top-0 z-[3] shrink-0 border-b border-brass/30 bg-paper/95 p-4 shadow-card backdrop-blur md:p-6">
           <p className="type-label text-crimson">CONFIDENTIAL DOSSIER FORM</p>
           <div className="flex items-center justify-between gap-3">
             <h2 className="font-display text-3xl text-espresso">{formTitle}</h2>
-            <button className="stamp border-walnut text-walnut" onClick={onClose}>关闭</button>
+            <button className="relative z-[5] shrink-0 border-2 border-crimson bg-espresso px-3 py-2 font-mono text-xs font-black uppercase tracking-[0.18em] text-paper shadow-[0_0_18px_rgba(139,31,36,0.45)] transition hover:bg-crimson focus:outline-none focus:ring-2 focus:ring-brass" onClick={onClose}>× 关闭</button>
           </div>
         </div>
 
