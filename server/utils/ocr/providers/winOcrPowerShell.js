@@ -55,7 +55,11 @@ const parseJsonOutput = (stdout) => {
   const output = String(stdout || '').replace(/^\uFEFF/, '').trim();
   if (!output) throw Object.assign(new Error('Windows OCR 未返回结果，请手动粘贴识别文本。'), { category: 'empty-output' });
   try { return JSON.parse(output); }
-  catch (error) { throw Object.assign(new Error('Windows OCR 返回内容不是合法 JSON，请检查 PowerShell 脚本输出。'), { category: 'invalid-json', cause: error }); }
+  catch (error) {
+    const gbkOutput = iconv.decode(Buffer.from(stdout || ''), 'gbk').replace(/^\uFEFF/, '').trim();
+    try { return JSON.parse(gbkOutput); }
+    catch { throw Object.assign(new Error('Windows OCR 返回内容不是合法 JSON，请检查 PowerShell 脚本输出。'), { category: 'invalid-json', cause: error }); }
+  }
 };
 const classifyPowerShellError = (error) => {
   if (error?.code === 'ENOENT') return '未检测到 powershell.exe，无法调用 Windows OCR，请手动粘贴识别文本。';
@@ -91,11 +95,13 @@ export const provider = {
     try {
       const { stdout } = await execFileAsync(command, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-Path', imagePath, '-Lang', language], { encoding: 'buffer', timeout: timeoutMs, maxBuffer: maxOutputBytes, windowsHide: true });
       const body = parseJsonOutput(decodeOutputBuffer(stdout));
-      if (body?.error) throw Object.assign(new Error(`Windows OCR 识别失败：${String(body.error)}`), { category: 'script-error' });
-      const rawText = String(body?.text || '').trim();
-      const cleanedText = normalizeText(rawText);
       const lines = Array.isArray(body?.lines) ? body.lines : [];
-      return { providerId: this.id, engine: 'Windows OCR', language, rawText, cleanedText, text: cleanedText, lines, warnings: [], error: cleanedText ? '' : '没有识别到文字，请手动粘贴识别文本。' };
+      const rawLineText = lines.map((line) => typeof line === 'string' ? line : line?.text).filter((line) => String(line || '').trim()).map(String).join('\n').trim();
+      const providerRawText = String(body?.text || '').trim();
+      const sourceOcrText = rawLineText || providerRawText;
+      const cleanedText = normalizeText(sourceOcrText);
+      const warnings = body?.error ? [`Windows OCR 返回错误：${String(body.error)}。请改用手动粘贴文本，当前截图证物已保留。`] : [];
+      return { providerId: this.id, engine: 'Windows OCR', language, rawText: sourceOcrText, providerRawText, rawLineText, sourceOcrText, cleanedText, text: cleanedText || sourceOcrText, lines, warnings, error: body?.error ? String(body.error) : (cleanedText ? '' : '没有识别到文字，请手动粘贴识别文本。') };
     } catch (error) {
       if (error?.category) throw Object.assign(error, { providerId: this.id });
       throw Object.assign(new Error(classifyPowerShellError(error)), { providerId: this.id, category: error?.code === 'ENOENT' ? 'missing-engine' : error?.code === 'ETIMEDOUT' ? 'timeout' : 'failed' });

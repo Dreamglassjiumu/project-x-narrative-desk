@@ -53,6 +53,7 @@ const splitList = (value) => {
   if (value === undefined || value === null || value === '') return [];
   return uniqueClean(String(value).split(/[;,，、；|/\n\r]/));
 };
+const tagNoiseSet = new Set(['R','A','B','C','O','I']);
 
 const fileExists = async (filePath) => Boolean(await fs.stat(filePath).catch(() => undefined));
 const readEnvFile = async () => {
@@ -291,7 +292,7 @@ const fieldDefinitions = {
   status: ['状态','Status'],
   spoilerLevel: ['保密等级','剧透等级','机密等级','Spoiler','Spoiler Level'],
   sourceNotes: ['来源','备注','来源备注','Source','Source Notes'],
-  gender: ['性别'], age: ['年龄','年 龄'], nationality: ['国籍'], ethnicity: ['民族','族裔'], occupation: ['职业','职 业','取王','职王'], weapon: ['武器'], attribute: ['属性'],
+  gender: ['性别'], age: ['年龄','年 龄'], nationality: ['国籍'], ethnicity: ['民族','族裔'], occupation: ['职业','职 业'], weapon: ['武器'], attribute: ['属性'],
   characterType: ['角色类型','人物类型'], characterArc: ['人物弧光','角色弧光'], currentTimelineStatus: ['当前状态','时间线状态'],
   relatedFactionIds: ['所属帮派','所 属 帮 派','所属组织','阵营','帮派','关联帮派','相关势力','关联势力','涉及帮派','涉及组织'],
   relatedDistrictIds: ['地区','所属区域','所 属 区 域','活动区域','涉及区域','关联区域'], relatedPoiIds: ['相关地点','常驻地点','涉及地点','关联地点'], relatedStorylineIds: ['相关剧情','可用剧本','登场剧本','登场剧情','关联剧情'], relatedCharacterIds: ['关系人','相关角色','涉及角色','登场角色','关联角色'],
@@ -301,9 +302,76 @@ const fieldDefinitions = {
   storylineType: ['剧情类型','任务类型','类型'], background: ['背景','故事背景'], playerGoal: ['玩家目标','目标'], coreConflict: ['核心冲突','冲突'], endings: ['结局','分支','结果'], dialogueText: ['台词','对话'],
   designAssetType: ['类型','物件类型','道具类型','武器类型','载具类型','设计资料类型'], category: ['类别','分类'], narrativeConstraints: ['叙事限制'], doNotRevealYet: ['暂不透露','不可提前透露'],
 };
+const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/[\s:_：=\-\/]/g, '');
+
+const exactFieldKeys = new Set(Object.values(fieldDefinitions).flat().map((item) => normalizeKey(item)));
+const fuzzyFieldAliases = {
+  occupation: ['职业','职 业','取王','职王','职亚','职工'],
+  tags: ['标签','标 签','标鉴'],
+  englishName: ['英文名','英 文 名','英文各','英艾名','英文铭'],
+  name: ['姓名','姓 名','名称','名字','姓各'],
+  relatedDistrictIds: ['所属区域','所 属 区 域','所属区城','所属城区','地区','区域'],
+  relatedFactionIds: ['所属帮派','所 属 帮 派','所属帮眸','帮派','帮眸','所属组织','组织'],
+  summary: ['简介','简 介','简个','简舟'],
+  age: ['年龄','年 龄','年令'],
+};
+const fuzzyKeyMap = new Map(Object.entries(fuzzyFieldAliases).flatMap(([field, keys]) => keys.map((key) => [normalizeKey(key), { field, canonical: fieldDefinitions[field]?.[0] || key, exact: exactFieldKeys.has(normalizeKey(key)) }])));
+const cleaningFieldStarts = [...new Set(Object.values(fieldDefinitions).flat().filter((item) => /[\u4e00-\u9fff]/.test(item)).concat(['活动区域','登场剧情','相关地点','常驻地点','关联角色','人物类型','保密等级','剧透等级','测试','OCR']))];
+const fieldStartPattern = new RegExp(`(^|\\s)(?:${cleaningFieldStarts.map((item) => item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\\s+/g, '\\s*')).join('|')})\\s*[:：=]`, 'gu');
+const cleanWindowsOcrText = (rawText = '') => {
+  const warnings = [];
+  const transformations = [];
+  let text = String(rawText || '').replace(/\r\n?/g, '\n');
+  if ((text.match(/�/g) || []).length >= 3) warnings.push('识别结果存在编码异常，请检查 Windows OCR 输出。');
+  const beforeSpaces = text;
+  text = text.split('\n').map((line) => line.trim().replace(/[ \t]{2,}/g, ' ')).join('\n');
+  if (text !== beforeSpaces) transformations.push({ type: 'normalize-space', label: '去除行首尾空格并合并连续空格' });
+  const beforeBlank = text;
+  text = text.replace(/\n{3,}/g, '\n\n');
+  if (text !== beforeBlank) transformations.push({ type: 'collapse-blank-lines', label: '合并连续空行' });
+  const lines = text.split('\n');
+  const splitLines = [];
+  let splitCount = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) { splitLines.push(''); continue; }
+    const matches = [...trimmed.matchAll(fieldStartPattern)];
+    if (matches.length > 1) {
+      splitCount += matches.length - 1;
+      for (let index = 0; index < matches.length; index += 1) {
+        const start = matches[index].index + (matches[index][1] ? matches[index][1].length : 0);
+        const end = index + 1 < matches.length ? matches[index + 1].index : trimmed.length;
+        splitLines.push(trimmed.slice(start, end).trim());
+      }
+    } else splitLines.push(trimmed);
+  }
+  if (splitCount) transformations.push({ type: 'split-merged-fields', label: `拆分 ${splitCount} 个被合并字段` });
+  return { cleanedText: splitLines.join('\n').replace(/\n{3,}/g, '\n\n').trim(), warnings, transformations };
+};
+const matchFieldKey = (key, targetType = '') => {
+  const exactField = keywordToField(key, targetType);
+  if (exactField) return { field: exactField, confidence: 0.95, warning: '', fuzzy: false, canonical: fieldDefinitions[exactField]?.[0] || key };
+  const fuzzy = fuzzyKeyMap.get(normalizeKey(key));
+  if (fuzzy) return { field: fuzzy.field, confidence: fuzzy.exact ? 0.9 : 0.68, warning: fuzzy.exact ? '' : '请确认：字段名来自 OCR 容错', fuzzy: !fuzzy.exact, canonical: fuzzy.canonical };
+  return { field: '', confidence: 0, warning: '', fuzzy: false, canonical: key };
+};
+const detectDesignType = (text, fields) => {
+  const hay = `${text}\n${Object.keys(fields).join('\n')}`;
+  const scores = [
+    ['boss', /Boss|BOSS|首领|敌人|Boss战|战斗阶段|弱点/g],
+    ['faction', /帮派|组织|公司|集团|家族|教会|执法机构|地盘|核心业务|敌人|盟友/g],
+    ['district', /区域|城区|街区|氛围|现实参考|主导势力/g],
+    ['poi', /地点|地址|店铺|地标|建筑|房间|安全屋|功能|所属区域/g],
+    ['storyline', /剧情|任务|目标|冲突|流程|结局|分支|台词/g],
+    ['other_design', /武器|道具|物件|载具|装备|服装|UI|机制|技能|线索|证据|美术参考/g],
+    ['character', /姓名|英文名|职业|年龄|性别|人物小传|角色类型|所属帮派|所属区域/g],
+  ].map(([id, re]) => [id, (hay.match(re) || []).length]);
+  scores.sort((a, b) => b[1] - a[1]);
+  return scores[0][1] > 0 ? { designType: scores[0][0], confidence: Math.min(0.95, 0.45 + scores[0][1] * 0.12) } : { designType: 'other_design', confidence: 0.2, warning: '资料类型不确定，请确认。' };
+};
+
 const arrayFieldSet = new Set(['aliases','tags','sourceNotes','culturalRoot','territoryDistrictIds','headquartersPoiIds','coreBusiness','allies','enemies','visualKeywords','missionTypes','atmosphere','dominantFactions','keyPoiIds','storyUsage','relatedFactionIds','relatedDistrictIds','relatedPoiIds','relatedCharacterIds','relatedStorylineIds','endings','narrativeConstraints','doNotRevealYet']);
 const multiLineFields = new Set(['details','summary','sourceNotes','background','storyUsage','dialogueText']);
-const normalizeKey = (value) => String(value || '').trim().toLowerCase().replace(/[\s:_：=\-\/]/g, '');
 const keywordToField = (key, targetType = '') => {
   const normalized = normalizeKey(key);
   if (normalized === '类型') {
@@ -380,20 +448,21 @@ const extractPairs = (text, targetType = '') => {
   let current;
   const commit = () => {
     if (!current) return;
-    pairs.push({ key: current.key, value: current.values.join('\n').trim(), line: current.lines.join('\n') });
+    pairs.push({ key: current.key, value: current.values.join('\n').trim(), line: current.lines.join('\n'), match: current.match });
     current = undefined;
   };
   for (const line of lines) {
     const explicit = /^([^:：=]{1,32})\s*[:：=]\s*(.*)$/.exec(line);
     const spaced = explicit ? undefined : /^([^\s]{2,16}|[A-Za-z][A-Za-z\s]{1,24})\s{2,}(.+)$/.exec(line);
     const match = explicit || spaced;
-    if (match && isLikelyFieldKey(match[1], targetType)) {
+    const fieldMatch = match ? matchFieldKey(match[1], targetType) : undefined;
+    if (match && fieldMatch?.field) {
       commit();
-      current = { key: match[1].trim(), values: [String(match[2] || '').trim()].filter(Boolean), lines: [line] };
+      current = { key: match[1].trim(), values: [String(match[2] || '').trim()].filter(Boolean), lines: [line], match: fieldMatch };
       consumed.add(line);
       continue;
     }
-    if (current && multiLineFields.has(keywordToField(current.key, targetType)) && !isLikelyFieldKey(line, targetType)) {
+    if (current && multiLineFields.has(current.match.field) && !(match && matchFieldKey(match[1], targetType).field)) {
       current.values.push(line);
       current.lines.push(line);
       consumed.add(line);
@@ -414,38 +483,58 @@ const normalizeAsset = (targetType, value = {}) => {
   return { ...base, storylineType: scalar(value.storylineType) || 'side', background: scalar(value.background), timeline: scalar(value.timeline), act: scalar(value.act), relatedPlayableCharacters: splitList(value.relatedPlayableCharacters), relatedBosses: splitList(value.relatedBosses), mainConflict: scalar(value.mainConflict || value.coreConflict), playerGoal: scalar(value.playerGoal), endingState: scalar(value.endingState || value.endings), endings: splitList(value.endings), dialogueText: scalar(value.dialogueText), timelinePlacement: scalar(value.timelinePlacement), pitchStatus: scalar(value.pitchStatus) || 'under_review' };
 };
 const parseOcrText = ({ text, designType, file, ocrProviderLabel = '' }) => {
-  const config = typeById.get(designType) || typeById.get('other_design');
-  const { lines, pairs, consumed } = extractPairs(text, config.targetType);
+  const cleaned = cleanWindowsOcrText(text);
+  const requested = typeById.get(designType) || typeById.get('other_design');
+  const firstPass = extractPairs(cleaned.cleanedText, requested.targetType);
+  const fieldBag = Object.fromEntries(firstPass.pairs.map((pair) => [pair.match?.field || keywordToField(pair.key, requested.targetType), pair.value]));
+  const guessed = detectDesignType(cleaned.cleanedText, fieldBag);
+  const config = designType === 'other_design' && guessed.designType !== 'other_design' ? (typeById.get(guessed.designType) || requested) : requested;
+  const { lines, pairs, consumed } = extractPairs(cleaned.cleanedText, config.targetType);
   const asset = { ...(config.defaults || {}) };
   const recognized = [];
+  const fieldConfidence = {};
   for (const pair of pairs) {
-    const field = keywordToField(pair.key, config.targetType);
+    const match = pair.match || matchFieldKey(pair.key, config.targetType);
+    const field = match.field;
     if (!field) continue;
     appendValue(asset, field, pair.value, designType);
-    recognized.push({ field, label: pair.key, value: pair.value });
+    recognized.push({ field, label: pair.key, value: pair.value, sourceLine: pair.line, confidence: match.confidence, warning: match.warning, fuzzy: match.fuzzy, canonicalLabel: match.canonical });
+    fieldConfidence[field] = { confidence: match.confidence, warning: match.warning, sourceLine: pair.line };
+  }
+  if (asset.tags) {
+    const tags = splitList(asset.tags);
+    asset.tags = tags;
+    const noise = tags.filter((tag) => tagNoiseSet.has(String(tag).toUpperCase()));
+    if (noise.length) fieldConfidence.tags = { ...(fieldConfidence.tags || {}), warning: '疑似 OCR 噪声，请确认。', noiseTags: noise };
   }
   const unrecognized = lines.filter((line) => !consumed.has(line));
-  if (designType === 'boss') { asset.characterType = 'boss'; asset.spoilerLevel = asset.spoilerLevel || 'secret'; }
+  if (config.id === 'boss' || designType === 'boss') { asset.characterType = 'boss'; asset.spoilerLevel = asset.spoilerLevel || 'secret'; }
   if (designType === 'playable_hero') asset.characterType = 'playable_hero';
-  if (/classified|绝密/i.test(text)) asset.spoilerLevel = 'classified';
-  else if (/机密|secret/i.test(text) || designType === 'boss') asset.spoilerLevel = 'secret';
+  if (/classified|绝密/i.test(cleaned.cleanedText)) asset.spoilerLevel = 'classified';
+  else if (/机密|secret/i.test(cleaned.cleanedText) || config.id === 'boss') asset.spoilerLevel = 'secret';
   else asset.spoilerLevel = asset.spoilerLevel || 'internal';
   const nameWasInferred = !asset.name && !asset.chineseName && !asset.englishName;
   if (!asset.name) asset.name = asset.chineseName || asset.englishName || path.basename(file.name || file.filename || 'OCR 草稿').replace(/\.[^.]+$/, '');
   const leftovers = unrecognized.join('\n').trim();
   if (!asset.summary && leftovers) asset.summary = leftovers.split(/\n/).slice(0, 2).join('\n').slice(0, 240);
-  if (!asset.details) asset.details = [asset.background, asset.dialogueText, leftovers || String(text || '').trim()].filter(Boolean).join('\n');
+  if (!asset.details) asset.details = [asset.background, asset.dialogueText, leftovers || String(cleaned.cleanedText || '').trim()].filter(Boolean).join('\n');
   else if (leftovers && !String(asset.details).includes(leftovers)) asset.details = [asset.details, leftovers].filter(Boolean).join('\n');
   asset.category = asset.category || config.label;
   asset.status = 'draft';
   asset.primaryEvidenceId = file.id || file.filename;
   const isWindowsOcr = ocrProviderLabel === 'Windows OCR';
   asset.sourceNotes = isWindowsOcr
-    ? [...splitList(asset.sourceNotes), 'Created from clipboard screenshot.', 'OCR provider: Windows OCR', 'OCR text should be reviewed by user.']
+    ? [...splitList(asset.sourceNotes), 'Created from clipboard screenshot.', 'OCR provider: Windows OCR.', 'OCR text reviewed by user.', 'Please verify OCR-derived fields.']
     : [...splitList(asset.sourceNotes), 'Created from clipboard screenshot.', 'OCR text pasted by user.', 'External OCR source unknown or user provided.'];
-  const warnings = ['识别结果需要人工校对', 'OCR 结果不会直接入库，请在草稿区确认'];
+  const fuzzyCount = recognized.filter((item) => item.fuzzy).length;
+  const warnings = ['识别结果需要人工校对', 'OCR 结果不会直接入库，请在草稿区确认', ...cleaned.warnings];
+  if (fuzzyCount >= 1) warnings.push('识别结果可能有错字，请重点检查标记为“请确认”的字段。');
+  if (String(cleaned.cleanedText).replace(/\s/g, '').length < 10) warnings.push('识别文本较少，可能未识别成功。');
+  if ((String(text).match(/�/g) || []).length >= 3) warnings.push('识别结果存在编码异常，请检查 Windows OCR 输出。');
+  if (fieldConfidence.tags?.noiseTags?.length) warnings.push('标签中可能包含 OCR 噪声。');
+  if (guessed.warning || (designType === 'other_design' && guessed.designType === 'other_design')) warnings.push('资料类型不确定，请确认。');
   if (nameWasInferred) warnings.push('未识别到明确名称，已用文件名作为草稿名称，请确认。');
-  return { targetType: config.targetType, targetFile: assetFiles[config.targetType] || `${config.targetType}.json`, asset: normalizeAsset(config.targetType, asset), recognizedFields: recognized, unrecognizedText: leftovers, sourceWillBecomePrimaryEvidence: Boolean(file?.id), sourceFileName: file.name, parserMode: isWindowsOcr ? 'Windows OCR + Clipboard Screenshot' : 'Clipboard Screenshot + External OCR Text', warnings };
+  return { targetType: config.targetType, targetFile: assetFiles[config.targetType] || `${config.targetType}.json`, asset: normalizeAsset(config.targetType, asset), recognizedFields: recognized, unrecognizedText: leftovers, sourceWillBecomePrimaryEvidence: Boolean(file?.id), sourceFileName: file.name, parserMode: isWindowsOcr ? 'Windows OCR + Clipboard Screenshot' : 'External OCR Text + Clipboard Screenshot', warnings: uniqueClean(warnings), fieldConfidence, cleanPreview: cleaned, guessedType: config.id, confidence: guessed.confidence };
 };
 const readOcr = async () => { await ensureJsonArrayFile(ocrResultsPath); return readJsonArray(ocrResultsPath); };
 const writeOcr = (records) => writeJsonArray(ocrResultsPath, records);
@@ -499,9 +588,12 @@ router.post('/run', async (req, res, next) => {
     const { result, provider, selectedStatus, attempts } = providerRun;
     const language = result.language || requestedLanguage;
     const statusLabel = selectedStatus?.message || provider.label;
-    const rawText = String(result.rawText || result.text || '').trim();
+    const rawText = String(result.sourceOcrText || result.rawText || result.text || '').trim();
+    const providerRawText = String(result.providerRawText || result.rawText || result.text || '').trim();
+    const rawLineText = String(result.rawLineText || '').trim();
+    const sourceOcrText = rawText;
     const cleanedText = String(result.cleanedText || result.text || '').trim();
-    const text = cleanedText;
+    const text = cleanedText || sourceOcrText;
 
     if (provider.id === 'manual-fallback') {
       const failed = await syncOcrFailure({ id, file, language: requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, engine: provider.id, error: result.error || manualFallbackError, status: 'manual_fallback' });
@@ -514,8 +606,8 @@ router.post('/run', async (req, res, next) => {
       provider.id === 'tesseract-cli' && language.includes('chi_sim') ? 'Tesseract 中文识别可能不稳定。复杂设定图建议使用 PaddleOCR 或粘贴外部 OCR 文本。' : '',
       text && hasOcrQualityWarning(text, requestedLanguage) ? ocrQualityHint : '',
     ].filter(Boolean);
-    const record = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: text ? 'done' : 'failed', text, rawText, cleanedText, language, requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, confidence: result.confidence, engine: provider.id, activeProvider: provider.id, error: text ? (result.error || '') : (result.error || emptyTextError), engineStatus: statusLabel, qualityWarnings: warnings, lines: result.lines || [], providerAttempts: attempts });
-    await syncUploadOcr(id, { status: record.status, text: record.text, rawText: record.rawText, cleanedText: record.cleanedText, language, preprocess, preprocessLabel, psmMode, psmLabel, confidence: record.confidence, engine: record.engine, activeProvider: provider.id, error: record.error, qualityWarnings: warnings, updatedAt: record.updatedAt });
+    const record = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: text ? 'done' : 'failed', text, rawText, cleanedText, language, requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, confidence: result.confidence, engine: provider.id, activeProvider: provider.id, error: text ? (result.error || '') : (result.error || emptyTextError), engineStatus: statusLabel, qualityWarnings: warnings, lines: result.lines || [], providerRawText, rawLineText, sourceOcrText, providerAttempts: attempts });
+    await syncUploadOcr(id, { status: record.status, text: record.text, rawText: record.rawText, providerRawText: record.providerRawText, rawLineText: record.rawLineText, sourceOcrText: record.sourceOcrText, cleanedText: record.cleanedText, language, preprocess, preprocessLabel, psmMode, psmLabel, confidence: record.confidence, engine: record.engine, activeProvider: provider.id, error: record.error, qualityWarnings: warnings, updatedAt: record.updatedAt });
     return res.json({ ...record, engineStatus: statusLabel, activeProvider: provider.id, providers: providerRun.status.providers });
   } catch (error) {
     const statusCode = Number(error?.statusCode || 500);
@@ -553,9 +645,9 @@ router.post('/draft', async (req, res, next) => {
     if (!typeById.has(designType)) return res.status(400).json({ error: '请选择资料类型。' });
     const ocrRecord = (await readOcr()).find((item) => item.sourceFileId === id);
     const isWindowsOcr = ocrRecord?.engine === 'winocr-powershell';
-    const parsed = parseOcrText({ text, designType, file, ocrProviderLabel: isWindowsOcr ? 'Windows OCR' : '' });
+    const parsed = parseOcrText({ text: String(req.body?.cleanedText || text).trim() || text, designType, file, ocrProviderLabel: isWindowsOcr ? 'Windows OCR' : '' });
     const draftAsset = normalizeAsset(parsed.targetType, { ...parsed.asset, ...(req.body?.asset && typeof req.body.asset === 'object' ? req.body.asset : {}) });
-    const draft = { id: `draft-${crypto.randomUUID()}`, targetType: parsed.targetType, asset: draftAsset, sourceFileId: file.id, sourceFileName: file.name, sourceFilePath: `uploads/${file.folder}/${file.filename}`, parserMode: isWindowsOcr ? 'Windows OCR + Clipboard Screenshot' : 'Clipboard Screenshot + External OCR Text', status: 'needs_review', createdAt: now(), updatedAt: now(), ocrText: text, sourceOcrText: text, cleanedOcrText: String(req.body?.cleanedText || text).trim(), ocrPreview: { recognizedFields: parsed.recognizedFields, unrecognizedText: parsed.unrecognizedText, targetFile: parsed.targetFile, sourceWillBecomePrimaryEvidence: parsed.sourceWillBecomePrimaryEvidence, warnings: parsed.warnings } };
+    const draft = { id: `draft-${crypto.randomUUID()}`, targetType: parsed.targetType, asset: draftAsset, sourceFileId: file.id, sourceFileName: file.name, sourceFilePath: `uploads/${file.folder}/${file.filename}`, parserMode: isWindowsOcr ? 'Windows OCR + Clipboard Screenshot' : 'External OCR Text + Clipboard Screenshot', status: 'needs_review', createdAt: now(), updatedAt: now(), ocrText: text, sourceOcrText: ocrRecord?.sourceOcrText || ocrRecord?.rawText || text, cleanedOcrText: String(req.body?.cleanedText || text).trim(), ocrProvider: isWindowsOcr ? 'winocr-powershell' : (ocrRecord?.engine || 'manual-fallback'), ocrWarnings: parsed.warnings, fieldConfidence: parsed.fieldConfidence, ocrPreview: { recognizedFields: parsed.recognizedFields, unrecognizedText: parsed.unrecognizedText, targetFile: parsed.targetFile, sourceWillBecomePrimaryEvidence: parsed.sourceWillBecomePrimaryEvidence, warnings: parsed.warnings, cleanPreview: parsed.cleanPreview, fieldConfidence: parsed.fieldConfidence } };
     await ensureJsonArrayFile(intakeDraftsPath);
     await writeJsonArray(intakeDraftsPath, [draft, ...(await readJsonArray(intakeDraftsPath))]);
     res.status(201).json({ draft, ...parsed });
