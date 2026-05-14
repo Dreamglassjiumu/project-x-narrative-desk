@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import { Router } from 'express';
 import { assetFiles, dataDir, intakeDraftsPath, ocrResultsPath, rootDir, uploadFolders, uploadIndexPath } from '../utils/paths.js';
 import { ensureJsonArrayFile, readJsonArray, writeJsonArray } from '../utils/jsonStore.js';
+import { getOcrProviderStatus, recognizeWithProviders } from '../utils/ocr/index.js';
 
 const router = Router();
 const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.webp']);
@@ -473,7 +474,7 @@ const syncUploadOcr = async (fileId, ocr) => {
 const buildRunFailure = (error) => ({ status: 'failed', engine: 'manual-fallback', error });
 
 router.get('/status', async (_req, res, next) => {
-  try { res.json(await getOcrEngineStatus()); }
+  try { res.json(await getOcrProviderStatus()); }
   catch (error) { next(error); }
 });
 router.get('/types', (_req, res) => res.json(designTypes));
@@ -490,86 +491,30 @@ router.post('/run', async (req, res, next) => {
     prepared = await tryPreprocessImage(filePath, requestedPreprocess);
     const preprocess = prepared.preprocess;
     const preprocessLabel = prepared.preprocessLabel;
-    const { engine, failure, statusLabel } = await resolveOcrEngine();
-    if (!engine || failure?.category === 'missing-engine') {
-      await syncOcrFailure({ id, file, language: requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, engine: 'manual-fallback', error: manualFallbackError, status: 'manual_fallback' });
-      return res.status(503).json(buildRunFailure(manualFallbackError));
-    }
-    if (failure?.category === 'blocked') {
-      await syncOcrFailure({ id, file, language: requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, engine: 'manual-fallback', error: blockedError, status: 'manual_fallback' });
-      return res.status(503).json(buildRunFailure(blockedError));
+    const requestedProvider = String(req.body?.provider || 'auto');
+    const providerRun = await recognizeWithProviders(prepared.filePath, { language: requestedLanguage, psmMode, provider: requestedProvider });
+    const { result, provider, selectedStatus, attempts } = providerRun;
+    const language = result.language || requestedLanguage;
+    const statusLabel = selectedStatus?.message || provider.label;
+    const text = String(result.text || '').trim();
+
+    if (provider.id === 'manual-fallback') {
+      const failed = await syncOcrFailure({ id, file, language: requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, engine: provider.id, error: result.error || manualFallbackError, status: 'manual_fallback' });
+      return res.status(503).json({ ...buildRunFailure(failed.error), activeProvider: provider.id, providers: providerRun.status.providers, attempts });
     }
 
-    const availableLanguages = await listEngineLanguages(engine);
-    const language = languageForRequest(requestedLanguage, availableLanguages);
-    if (requestedLanguage === 'chi_sim' && !availableLanguages.includes('chi_sim')) {
-      const failed = await syncOcrFailure({ id, file, language: 'chi_sim', preprocess, preprocessLabel, psmMode, psmLabel, engine: engine.name, error: missingChineseLanguagePackError, status: 'failed' });
-      return res.status(400).json({ ...failed, engineStatus: statusLabel, error: missingChineseLanguagePackError });
-    }
-
-    await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: 'processing', text: '', language, requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, engine: engine.name, error: '' });
-    const canUseLanguage = await verifyLanguagePacks(engine, language);
-    if (!canUseLanguage) {
-      if (language.includes('chi_sim') && await verifyLanguagePacks(engine, 'eng')) {
-        try {
-          const fallback = await runTesseract(engine, prepared.filePath, 'eng', psmMode);
-          const text = fallback.text.trim();
-          const warnings = [prepared.warning, text && hasOcrQualityWarning(text, requestedLanguage) ? ocrQualityHint : ''].filter(Boolean);
-          const record = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: text ? 'done' : 'failed', text, language: 'eng', preprocess, preprocessLabel, psmMode, psmLabel, confidence: undefined, engine: engine.name, error: text ? chineseFallbackWarning : emptyTextError, engineStatus: statusLabel, qualityWarnings: warnings });
-          await syncUploadOcr(id, { status: record.status, text: record.text, language: record.language, preprocess, preprocessLabel, psmMode, psmLabel, confidence: record.confidence, engine: record.engine, error: record.error, qualityWarnings: warnings, updatedAt: record.updatedAt });
-          return res.json({ ...record, engineStatus: statusLabel });
-        } catch (error) {
-          const classified = classifyOcrError(error);
-          if (classified.category === 'blocked') {
-            const failed = await syncOcrFailure({ id, file, language: 'eng', preprocess, preprocessLabel, psmMode, psmLabel, engine: 'manual-fallback', error: blockedError, status: 'manual_fallback' });
-            return res.status(503).json(buildRunFailure(failed.error));
-          }
-          const failed = await syncOcrFailure({ id, file, language: 'eng', preprocess, preprocessLabel, psmMode, psmLabel, engine: engine.name, error: classified.message });
-          return res.json({ ...failed, engineStatus: engineStatusLabel(engine, classified) });
-        }
-      }
-      const failed = await syncOcrFailure({ id, file, language, preprocess, preprocessLabel, psmMode, psmLabel, engine: engine.name, error: missingLanguagePackError });
-      return res.json({ ...failed, engineStatus: statusLabel });
-    }
-
-    try {
-      const result = await runTesseract(engine, prepared.filePath, language, psmMode);
-      const text = result.text.trim();
-      const usedEnglishFallback = requestedLanguage === 'chi_sim+eng' && language === 'eng';
-      const warnings = [prepared.warning, text && hasOcrQualityWarning(text, requestedLanguage) ? ocrQualityHint : ''].filter(Boolean);
-      const record = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: text ? 'done' : 'failed', text, language, requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, confidence: undefined, engine: engine.name, error: text ? (usedEnglishFallback ? chineseFallbackWarning : '') : emptyTextError, engineStatus: statusLabel, qualityWarnings: warnings });
-      await syncUploadOcr(id, { status: record.status, text: record.text, language, preprocess, preprocessLabel, psmMode, psmLabel, confidence: record.confidence, engine: record.engine, error: record.error, qualityWarnings: warnings, updatedAt: record.updatedAt });
-      return res.json({ ...record, engineStatus: statusLabel });
-    } catch (error) {
-      const classified = classifyOcrError(error);
-      if (language.includes('chi_sim') && !['blocked', 'timeout', 'missing-engine'].includes(classified.category) && await verifyLanguagePacks(engine, 'eng')) {
-        try {
-          const fallback = await runTesseract(engine, prepared.filePath, 'eng', psmMode);
-          const text = fallback.text.trim();
-          const warnings = [prepared.warning, text && hasOcrQualityWarning(text, requestedLanguage) ? ocrQualityHint : ''].filter(Boolean);
-          const record = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: text ? 'done' : 'failed', text, language: 'eng', preprocess, preprocessLabel, psmMode, psmLabel, confidence: undefined, engine: engine.name, error: text ? chineseFallbackWarning : emptyTextError, engineStatus: statusLabel, qualityWarnings: warnings });
-          await syncUploadOcr(id, { status: record.status, text: record.text, language: record.language, preprocess, preprocessLabel, psmMode, psmLabel, confidence: record.confidence, engine: record.engine, error: record.error, qualityWarnings: warnings, updatedAt: record.updatedAt });
-          return res.json({ ...record, engineStatus: statusLabel });
-        } catch (fallbackError) {
-          const fallbackClassified = classifyOcrError(fallbackError);
-          if (fallbackClassified.category === 'blocked') {
-            const failed = await syncOcrFailure({ id, file, language: 'eng', preprocess, preprocessLabel, psmMode, psmLabel, engine: 'manual-fallback', error: blockedError, status: 'manual_fallback' });
-            return res.status(503).json(buildRunFailure(failed.error));
-          }
-          const failed = await syncOcrFailure({ id, file, language: 'eng', preprocess, preprocessLabel, psmMode, psmLabel, engine: engine.name, error: fallbackClassified.message });
-          return res.json({ ...failed, engineStatus: engineStatusLabel(engine, fallbackClassified) });
-        }
-      }
-      if (classified.category === 'blocked') {
-        const failed = await syncOcrFailure({ id, file, language, preprocess, preprocessLabel, psmMode, psmLabel, engine: 'manual-fallback', error: blockedError, status: 'manual_fallback' });
-        return res.status(503).json(buildRunFailure(failed.error));
-      }
-      const failed = await syncOcrFailure({ id, file, language, preprocess, preprocessLabel, psmMode, psmLabel, engine: engine.name, error: classified.message, status: 'failed' });
-      return res.json({ ...failed, engineStatus: engineStatusLabel(engine, classified) });
-    }
+    const warnings = [
+      prepared.warning,
+      ...(result.warnings || []),
+      provider.id === 'tesseract-cli' && language.includes('chi_sim') ? 'Tesseract 中文识别可能不稳定。复杂设定图建议使用 PaddleOCR 或粘贴外部 OCR 文本。' : '',
+      text && hasOcrQualityWarning(text, requestedLanguage) ? ocrQualityHint : '',
+    ].filter(Boolean);
+    const record = await upsertOcr({ sourceFileId: id, sourceFileName: file.name, status: text ? 'done' : 'failed', text, language, requestedLanguage, preprocess, preprocessLabel, psmMode, psmLabel, confidence: result.confidence, engine: provider.id, activeProvider: provider.id, error: text ? (result.error || '') : (result.error || emptyTextError), engineStatus: statusLabel, qualityWarnings: warnings, lines: result.lines || [], providerAttempts: attempts });
+    await syncUploadOcr(id, { status: record.status, text: record.text, language, preprocess, preprocessLabel, psmMode, psmLabel, confidence: record.confidence, engine: record.engine, activeProvider: provider.id, error: record.error, qualityWarnings: warnings, updatedAt: record.updatedAt });
+    return res.json({ ...record, engineStatus: statusLabel, activeProvider: provider.id, providers: providerRun.status.providers });
   } catch (error) {
     const statusCode = Number(error?.statusCode || 500);
-    if (statusCode < 500) return res.status(statusCode).json({ status: 'failed', engine: 'manual-fallback', error: error.message || 'OCR 请求失败，请检查本地服务。' });
+    if (statusCode < 500) return res.status(statusCode).json({ status: 'failed', engine: error.providerId || 'manual-fallback', error: error.message || 'OCR 请求失败，请检查本地服务。' });
     next(error);
   } finally {
     await cleanupTempFile(prepared?.tempFilePath);
@@ -619,7 +564,7 @@ router.put('/:fileId', async (req, res, next) => {
     const id = safeId(req.params.fileId);
     const file = await findUpload(id);
     const text = String(req.body?.text || '');
-    const record = await upsertOcr({ sourceFileId: id, sourceFileName: file?.name || req.body?.sourceFileName || id, status: text.trim() ? 'manual' : 'none', text, language: req.body?.language || 'chi_sim+eng', engine: 'manual', error: '' });
+    const record = await upsertOcr({ sourceFileId: id, sourceFileName: file?.name || req.body?.sourceFileName || id, status: text.trim() ? 'manual' : 'none', text, language: req.body?.language || 'chi_sim+eng', engine: 'manual-fallback', activeProvider: 'manual-fallback', error: '' });
     await syncUploadOcr(id, { status: record.status, text: record.text, language: record.language, engine: record.engine, error: record.error, updatedAt: record.updatedAt });
     res.json(record);
   } catch (error) { next(error); }
