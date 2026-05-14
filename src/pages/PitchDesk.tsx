@@ -6,7 +6,7 @@ import { PitchEditor } from '../components/pitch/PitchEditor';
 import { PitchInsightPanel } from '../components/pitch/PitchInsightPanel';
 import { PitchLoader } from '../components/pitch/PitchLoader';
 import { defaultPitchDraft, getPitchLinkedAssets, normalizePitchDraft, normalizeSavedPitch, PITCH_STORAGE_KEY, serializePitchText, type PitchDraft, type SavedPitch } from '../utils/pitch';
-import { archiveErrorMessage, createAsset, deletePitch, upsertPitch, type AssetBundle } from '../utils/api';
+import { archiveErrorMessage, createAsset, deletePitch, upsertPitch, type AssetBundle, type UploadedFileRecord } from '../utils/api';
 import { detectAssetMentions, searchAssets } from '../utils/search';
 import { SearchBox } from '../components/layout/SearchBox';
 import type { ArchiveNotifier } from '../components/ui/ArchiveNotice';
@@ -62,13 +62,44 @@ function ArchiveSearchCard({ asset, onOpen, onAdd }: { asset: AnyAsset; onOpen: 
   );
 }
 
-export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }: { assets: AnyAsset[]; bundle: AssetBundle; apiOnline: boolean; onAssetsChanged: (bundle: AssetBundle) => void; notify: ArchiveNotifier }) {
+export function PitchDesk({ assets, bundle, files, apiOnline, onAssetsChanged, notify }: { assets: AnyAsset[]; bundle: AssetBundle; files: UploadedFileRecord[]; apiOnline: boolean; onAssetsChanged: (bundle: AssetBundle) => void; notify: ArchiveNotifier }) {
   const [draft, setDraft] = useState<PitchDraft>(loadDraft);
   const [query, setQuery] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<AnyAsset | undefined>();
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(apiOnline ? 'autosaved' : 'offline');
   const savedSnapshot = useRef(JSON.stringify(draft));
+
+  useEffect(() => {
+    const warn = '当前 Pitch 可能尚未保存，建议先保存或在新标签页打开。';
+    const hasUnsavedPitch = () => saveStatus === 'unsaved';
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedPitch()) return;
+      event.preventDefault();
+      event.returnValue = warn;
+    };
+    const onPitchBeforeLeave = (event: Event) => {
+      if (!hasUnsavedPitch()) return;
+      window.alert(warn);
+      event.preventDefault();
+    };
+    const onDocumentClick = (event: MouseEvent) => {
+      if (!hasUnsavedPitch()) return;
+      const target = event.target instanceof Element ? event.target.closest('a[href]') : null;
+      if (!(target instanceof HTMLAnchorElement)) return;
+      if (target.target === '_blank') return;
+      event.preventDefault();
+      window.alert(warn);
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    window.addEventListener('projectx:pitch-before-leave', onPitchBeforeLeave);
+    document.addEventListener('click', onDocumentClick, true);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      window.removeEventListener('projectx:pitch-before-leave', onPitchBeforeLeave);
+      document.removeEventListener('click', onDocumentClick, true);
+    };
+  }, [saveStatus]);
 
   const savedPitches = useMemo(() => bundle.pitches.map(normalizeSavedPitch), [bundle.pitches]);
   const filtered = useMemo(() => searchAssets(assets, query).slice(0, 8), [assets, query]);
@@ -230,7 +261,7 @@ export function PitchDesk({ assets, bundle, apiOnline, onAssetsChanged, notify }
         <PitchEditor draft={draft} assets={bundle} onChange={updateDraft} />
       </main>
 
-      <PitchInsightPanel draft={draft} manualLinks={manualLinks} detected={detected} riskAssets={riskAssets} saveStatus={saveStatus} allAssets={assets} onInsertName={insertAssetName} onInsertReference={insertAssetReference} onAddToLinks={addToPitchLinks} />
+      <PitchInsightPanel draft={draft} manualLinks={manualLinks} detected={detected} riskAssets={riskAssets} saveStatus={saveStatus} allAssets={assets} files={files} onInsertName={insertAssetName} onInsertReference={insertAssetReference} onAddToLinks={addToPitchLinks} />
       <ConfirmDialog open={confirmDelete} title="删除 Pitch？" message="此 Pitch 将从 data/pitches.json 中删除。" confirmLabel="删除 Pitch" onCancel={() => setConfirmDelete(false)} onConfirm={() => void remove()} />
     </div>
   );
