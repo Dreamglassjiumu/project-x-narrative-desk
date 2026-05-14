@@ -203,12 +203,12 @@ npm run dev:client
 
 4. 打开图片证物的 OCR 面板，点击“识别文字”。
 
-`/api/ocr/run` 会按以下顺序查找 OCR 引擎：
+`/api/ocr/run` 会通过多 OCR provider 自动推荐可用引擎：
 
-1. 项目内 portable OCR：`tools/ocr/tesseract/tesseract.exe`
-2. `.env` 中的 `TESSERACT_CMD=...`
-3. 系统 `PATH` 中的 `tesseract`
-4. 如果都不可用，则回到手动粘贴 OCR 文本流程，并提示“未检测到本地 OCR 引擎，请手动粘贴识别文本。”
+1. PaddleOCR HTTP 本地服务（可选，配置 `PADDLEOCR_URL`）
+2. PaddleOCR CLI 脚本（可选，配置 `PADDLEOCR_CMD` / `PADDLEOCR_SCRIPT`）
+3. Tesseract CLI（项目内 portable OCR、`.env` 中的 `TESSERACT_CMD=...`、或系统 `PATH`）
+4. 如果本地引擎都不可用，则回到手动粘贴 OCR 文本流程，并提示“未检测到本地 OCR 引擎，请手动粘贴识别文本。”
 
 语言映射为：中英混合 `chi_sim+eng`、中文 `chi_sim`、英文 `eng`。如果中文语言包不可用，系统会尝试使用英文识别，并在 OCR 面板提示“中文语言包不可用，已尝试英文识别。”
 
@@ -261,3 +261,78 @@ Summary: This is a test character.
 - 中英混排设定图
 
 OCR 结果需要人工校对，不能直接入库；请在 OCR 文本编辑器中校对、可选“清洗文本”，再生成 Parsed Draft 并到解析草稿区确认。
+
+## 可选：接入 PaddleOCR 提升中文识别质量
+
+v0.5.6 起，OCR 后端使用多 provider 架构，优先级为：
+
+1. `paddleocr-http`：PaddleOCR 本地服务
+2. `paddleocr-cli`：PaddleOCR 命令行脚本
+3. `tesseract-cli`：项目内 portable Tesseract / `.env` / system PATH
+4. `manual-fallback`：手动粘贴外部 OCR 文本
+
+Tesseract 仍会保留，适合英文、简单截图、白底黑字等轻量场景；中文复杂设定图、长图、表格化设定卡建议优先使用 PaddleOCR。PaddleOCR 是可选能力：没有安装或没有配置时，项目仍会自动 fallback 到 Tesseract 或手动粘贴流程，不影响基本运行。
+
+### 方式 A：PaddleOCR HTTP 本地服务
+
+如果你已经在本机或内网工具目录中准备了 PaddleOCR 服务，可在 `.env` 中配置：
+
+```env
+PADDLEOCR_URL=http://127.0.0.1:8866/ocr
+```
+
+后端会向该地址发送：
+
+```text
+POST PADDLEOCR_URL
+multipart/form-data:
+- image: file
+- language: zh/en/mixed
+```
+
+期望服务返回：
+
+```json
+{
+  "text": "...",
+  "lines": [
+    { "text": "...", "confidence": 0.95, "bbox": [] }
+  ]
+}
+```
+
+如果服务没有启动或不可访问，`/api/ocr/status` 会显示“未检测到 PaddleOCR 本地服务”，OCR 页面仍可继续使用 Tesseract 或手动粘贴。
+
+### 方式 B：PaddleOCR CLI 脚本
+
+如果你准备的是本地脚本，可在 `.env` 中配置：
+
+```env
+PADDLEOCR_CMD=python
+PADDLEOCR_SCRIPT=D:\ocr-tools\paddle_ocr_runner.py
+```
+
+后端会执行：
+
+```text
+python D:\ocr-tools\paddle_ocr_runner.py <imagePath> --lang ch
+```
+
+脚本需要向标准输出打印 JSON：
+
+```json
+{
+  "text": "...",
+  "lines": []
+}
+```
+
+脚本不存在、执行失败或输出不是 JSON 时，自动推荐模式会 fallback 到下一可用 OCR 引擎；如果在前端强制选择了不可用的 PaddleOCR 引擎，会提示“该 OCR 引擎不可用，请检查配置或改用手动粘贴。”
+
+### 公司电脑无法安装 PaddleOCR 时
+
+如果公司电脑不能安装 PaddleOCR，可以：
+
+- 在允许的环境中配置并打包 PaddleOCR 工具，再通过 HTTP 或 CLI 方式接入。
+- 继续使用 Windows 截图、Office、企业微信、飞书或其他公司工具做 OCR，然后在面板中使用“粘贴外部 OCR 文本”。
+- 粘贴后的流程与本地 OCR 完全一致：清洗文本 → 保存文本 → 选择资料类型 → 生成草稿预览 → 确认生成 Parsed Draft → 再执行 Approve & File。

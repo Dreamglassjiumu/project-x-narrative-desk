@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { IntakeDraft, OcrDesignType, OcrDraftPreview, OcrResult, UploadedFileRecord } from '../../utils/api';
+import type { IntakeDraft, OcrDesignType, OcrDraftPreview, OcrProviderStatus, OcrResult, UploadedFileRecord } from '../../utils/api';
 import { ApiError, archiveErrorMessage, createOcrDraft, getOcrEngineStatus, getOcrResult, listOcrDesignTypes, previewOcrDraft, runOcr, saveOcrText } from '../../utils/api';
 import type { ArchiveNotifier } from '../ui/ArchiveNotice';
 
@@ -18,6 +18,14 @@ const preprocessOptions = [
   { value: 'gray_contrast_scale2', label: '灰度 + 对比度 + 放大 2 倍' },
   { value: 'gray_contrast_scale3', label: '灰度 + 对比度 + 放大 3 倍' },
 ];
+const providerOptions = [
+  { value: 'auto', label: '自动推荐' },
+  { value: 'paddleocr-http', label: 'PaddleOCR 本地服务' },
+  { value: 'paddleocr-cli', label: 'PaddleOCR 命令行' },
+  { value: 'tesseract-cli', label: 'Tesseract 便携版' },
+  { value: 'manual-fallback', label: '手动粘贴' },
+];
+const providerLabel = (id?: string) => providerOptions.find((item) => item.value === id)?.label || id || '自动推荐';
 const psmOptions = [
   { value: 'auto', label: '自动' },
   { value: 'block', label: '单块文本' },
@@ -66,6 +74,7 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
   const [ocr, setOcr] = useState<OcrResult>({ sourceFileId: file.id, sourceFileName: file.name, status: 'none', text: '' });
   const [text, setText] = useState('');
   const [language, setLanguage] = useState('auto');
+  const [provider, setProvider] = useState('auto');
   const [preprocess, setPreprocess] = useState('scale2');
   const [psmMode, setPsmMode] = useState('block');
   const [designType, setDesignType] = useState('other_design');
@@ -75,6 +84,8 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
   const runningRef = useRef(false);
   const [message, setMessage] = useState('OCR 结果不会直接入库，请在草稿区确认。');
   const [engineStatus, setEngineStatus] = useState('OCR 不可用，可手动粘贴');
+  const [activeProvider, setActiveProvider] = useState('manual-fallback');
+  const [providerStatuses, setProviderStatuses] = useState<OcrProviderStatus[]>([]);
   const [languageStatus, setLanguageStatus] = useState<{ eng?: boolean; chi_sim?: boolean }>({});
   const [cleanUndo, setCleanUndo] = useState<string | null>(null);
   const [preview, setPreview] = useState<OcrDraftPreview | null>(null);
@@ -83,8 +94,8 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     if (!apiOnline) return;
     let cancelled = false;
     setHasRunAttempt(false);
-    void getOcrResult(file.id).then((result) => { if (!cancelled) { setOcr(result); setText(result.text || ''); setLanguage(result.language || 'auto'); setPreprocess(result.preprocess || 'scale2'); setPsmMode(result.psmMode || 'block'); if (result.engineStatus || result.statusLabel) setEngineStatus(result.engineStatus || result.statusLabel || 'OCR 不可用，可手动粘贴'); } }).catch(() => undefined);
-    void getOcrEngineStatus().then((status) => { if (!cancelled) { setEngineStatus(status.statusLabel || status.message || 'OCR 不可用，可手动粘贴'); setLanguageStatus(status.languageStatus || { eng: status.languages.includes('eng'), chi_sim: status.languages.includes('chi_sim') }); if (status.languageWarnings?.length) setMessage(status.languageWarnings.join(' ')); } }).catch(() => { if (!cancelled) setEngineStatus('OCR 不可用，可手动粘贴'); });
+    void getOcrResult(file.id).then((result) => { if (!cancelled) { setOcr(result); setText(result.text || ''); setLanguage(result.language || 'auto'); setPreprocess(result.preprocess || 'scale2'); setPsmMode(result.psmMode || 'block'); if (result.activeProvider || result.engine) setActiveProvider(result.activeProvider || result.engine || 'manual-fallback'); if (result.engineStatus || result.statusLabel) setEngineStatus(result.engineStatus || result.statusLabel || 'OCR 不可用，可手动粘贴'); } }).catch(() => undefined);
+    void getOcrEngineStatus().then((status) => { if (!cancelled) { setEngineStatus(status.statusLabel || status.message || 'OCR 不可用，可手动粘贴'); setActiveProvider(status.activeProvider || status.engine || 'manual-fallback'); setProviderStatuses(status.providers || []); setLanguageStatus(status.languageStatus || { eng: status.languages.includes('eng'), chi_sim: status.languages.includes('chi_sim') }); if (status.languageWarnings?.length) setMessage(status.languageWarnings.join(' ')); } }).catch(() => { if (!cancelled) setEngineStatus('OCR 不可用，可手动粘贴'); });
     void listOcrDesignTypes().then((items) => { if (!cancelled) setTypes(items); }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [apiOnline, file.id]);
@@ -96,8 +107,9 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     setHasRunAttempt(true);
     setBusy(true); setMessage('识别中 · 请等待本地 OCR 引擎处理，结果需要人工校对。');
     try {
-      const result = await runOcr({ fileId: file.id, language, preprocess, psmMode });
-      setOcr(result); setText(result.text || ''); if (result.engineStatus || result.statusLabel) setEngineStatus(result.engineStatus || result.statusLabel || 'OCR 不可用，可手动粘贴');
+      if (provider === 'manual-fallback') { setMessage('已切换到手动粘贴模式：请粘贴外部 OCR 文本，清洗、保存后生成草稿。'); return; }
+      const result = await runOcr({ fileId: file.id, language, preprocess, psmMode, provider });
+      setOcr(result); setText(result.text || ''); if (result.activeProvider || result.engine) setActiveProvider(result.activeProvider || result.engine || activeProvider); if (result.providers?.length) setProviderStatuses(result.providers); if (result.engineStatus || result.statusLabel) setEngineStatus(result.engineStatus || result.statusLabel || 'OCR 不可用，可手动粘贴');
       const qualityWarnings = result.qualityWarnings?.length ? result.qualityWarnings.join(' ') : (result.text && hasLocalQualityWarning(result.text, language) ? qualityHint : '');
       const friendly = result.text ? `识别完成。实际预处理：${result.preprocessLabel || result.preprocess || preprocess}；识别版式：${result.psmLabel || psmMode}。${qualityWarnings ? ` ${qualityWarnings}` : ' 请先校对识别文本，再生成草稿。'}` : result.error || '没有识别到文字，请尝试更清晰的图片，或手动粘贴文本。';
       setMessage(friendly);
@@ -107,7 +119,7 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
       const engineLabel = fallbackStatusFromError(friendly);
       const body = error instanceof ApiError && typeof error.body === 'object' && error.body ? error.body as { engine?: string; status?: string; error?: string } : undefined;
       setEngineStatus(engineLabel);
-      setOcr((current) => ({ ...current, status: body?.status === 'failed' ? 'failed' : current.status, engine: body?.engine || 'manual-fallback', engineStatus: engineLabel, statusLabel: engineLabel, error: friendly }));
+      setOcr((current) => ({ ...current, status: body?.status === 'failed' ? 'failed' : current.status, engine: body?.engine || 'manual-fallback', activeProvider: body?.engine || 'manual-fallback', engineStatus: engineLabel, statusLabel: engineLabel, error: friendly }));
       setMessage(friendly);
       notify?.({ tone: 'error', title: friendly });
     } finally { runningRef.current = false; setBusy(false); }
@@ -156,6 +168,9 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
     finally { setBusy(false); }
   };
 
+  const selectedProviderStatus = providerStatuses.find((item) => item.id === provider);
+  const tesseractChineseTip = (activeProvider === 'tesseract-cli' || provider === 'tesseract-cli') && (language === 'chi_sim' || language === 'chi_sim+eng' || language === 'auto');
+
   return (
     <section className="border border-brass/30 bg-espresso/10 p-3 text-espresso">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -164,16 +179,19 @@ export function OcrResultEditor({ file, apiOnline, notify, onDraftCreated }: { f
       </div>
       <div className="mt-3 grid gap-3 md:grid-cols-[120px_1fr]">
         <img src={file.url} alt={file.name} className="h-28 w-28 border-4 border-paper object-cover shadow-noir" />
-        <div className="grid gap-2 text-xs text-walnut/75"><span>文件名：{file.name}</span><span>OCR 语言：{ocr.language || language}</span><span>实际预处理：{ocr.preprocessLabel || preprocessOptions.find((item) => item.value === preprocess)?.label || preprocess}</span><span>识别版式：{ocr.psmLabel || psmOptions.find((item) => item.value === psmMode)?.label || psmMode}</span><span>置信度：{ocr.confidence ? `${(ocr.confidence * 100).toFixed(1)}%` : '暂无'}</span><span>当前引擎：{(ocr.engine || '').includes('tesseract') || engineStatus.includes('项目内') ? '项目内 OCR' : '可选本地引擎 / 手动粘贴'}</span><span>引擎状态：{ocr.engineStatus || ocr.statusLabel || engineStatus}</span><span>英文识别：{languageStatus.eng ? '可用' : '不可用'}</span><span>简体中文识别：{languageStatus.chi_sim ? '可用' : '不可用'}</span>{ocr.error ? <span className="text-crimson">{ocr.error}</span> : null}</div>
+        <div className="grid gap-2 text-xs text-walnut/75"><span>文件名：{file.name}</span><span>OCR 语言：{ocr.language || language}</span><span>实际预处理：{ocr.preprocessLabel || preprocessOptions.find((item) => item.value === preprocess)?.label || preprocess}</span><span>识别版式：{ocr.psmLabel || psmOptions.find((item) => item.value === psmMode)?.label || psmMode}</span><span>置信度：{ocr.confidence ? `${(ocr.confidence * 100).toFixed(1)}%` : '暂无'}</span><span>当前引擎：{providerLabel(activeProvider)}</span><span>引擎状态：{ocr.engineStatus || ocr.statusLabel || engineStatus}</span><span>英文识别：{languageStatus.eng ? '可用' : '不可用'}</span><span>简体中文识别：{languageStatus.chi_sim ? '可用' : '不可用'}</span>{ocr.error ? <span className="text-crimson">{ocr.error}</span> : null}</div>
       </div>
-      <div className="mt-3 grid gap-2 md:grid-cols-4">
+      <div className="mt-3 grid gap-2 md:grid-cols-5">
+        <label><span className="field-label">识别引擎</span><select className="paper-input" value={provider} onChange={(e) => { setProvider(e.target.value); setPreview(null); }}>{providerOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label><span className="field-label">识别语言</span><select className="paper-input" value={language} onChange={(e) => setLanguage(e.target.value)}>{languageOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label><span className="field-label">图片预处理</span><select className="paper-input" value={preprocess} onChange={(e) => setPreprocess(e.target.value)}>{preprocessOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label><span className="field-label">识别版式</span><select className="paper-input" value={psmMode} onChange={(e) => setPsmMode(e.target.value)}>{psmOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
         <label><span className="field-label">资料类型</span><select className="paper-input" value={designType} onChange={(e) => setDesignType(e.target.value)}>{types.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select></label>
       </div>
-      <label className="mt-3 block"><span className="field-label">识别文本 · 手动粘贴识别文本</span><textarea className="paper-input min-h-44" value={text} onChange={(e) => setText(e.target.value)} placeholder="本地 OCR 引擎不可用时，请手动粘贴识别文本。" /></label>
-      <p className="mt-2 border border-brass/20 bg-brass/10 p-2 text-xs text-walnut/75">中文图片建议选择“中文”而不是“中英混合”。复杂设定图建议先裁剪文字区域再识别。请先校对识别文本，再生成草稿。{message}</p>
+      <div className="mt-3 border border-brass/20 bg-paper/70 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-bold text-espresso">粘贴外部 OCR 文本</p><p className="text-xs text-walnut/75">如果本地 OCR 效果不好，可以使用外部 OCR 工具识别后，把文本粘贴到这里。后续字段解析和建档流程完全一致。</p></div><button className="stamp border-brass text-brass" type="button" onClick={() => setProvider('manual-fallback')}>切到手动粘贴</button></div><label className="mt-2 block"><span className="field-label">识别文本 · 外部 OCR / 手动粘贴</span><textarea className="paper-input min-h-44" value={text} onChange={(e) => { setText(e.target.value); setPreview(null); }} placeholder="可从 Windows 截图、Office、企业微信、飞书或其他公司工具复制 OCR 文本后粘贴到这里。" /></label></div>
+      <p className="mt-2 border border-brass/20 bg-brass/10 p-2 text-xs text-walnut/75">中文复杂图建议使用 PaddleOCR 或外部 OCR 文本粘贴。自动推荐会按 PaddleOCR 本地服务 → PaddleOCR 命令行 → Tesseract → 手动粘贴 fallback。{selectedProviderStatus && provider !== 'auto' && !selectedProviderStatus.available ? '该 OCR 引擎不可用，请检查配置或改用手动粘贴。' : ''} {message}</p>
+      {tesseractChineseTip ? <p className="mt-2 border border-crimson/30 bg-crimson/10 p-2 text-xs text-crimson">Tesseract 中文识别可能不稳定。复杂设定图建议使用 PaddleOCR 或粘贴外部 OCR 文本。</p> : null}
+      {providerStatuses.length ? <div className="mt-2 grid gap-1 text-xs text-walnut/75 md:grid-cols-2">{providerStatuses.map((item) => <span key={item.id} className={item.available ? 'text-walnut/80' : 'text-walnut/50'}>{item.available ? '可用' : '不可用'} · {item.label}{item.message ? `：${item.message}` : ''}</span>)}</div> : null}
       {(ocr.qualityWarnings?.length || hasLocalQualityWarning(text, language)) ? <p className="mt-2 border border-crimson/30 bg-crimson/10 p-2 text-xs text-crimson">{ocr.qualityWarnings?.join(' ') || qualityHint}</p> : null}
       <div className="mt-3 flex flex-wrap gap-2">
         <button className="stamp border-brass text-brass disabled:opacity-50" disabled={!apiOnline || busy} onClick={() => void run()}>{ocr.text || hasRunAttempt ? '重新识别' : '识别文字'}</button>
