@@ -6,7 +6,7 @@ import { dossierTemplates } from '../components/templates/templateDefaults';
 import { statusLabel } from '../i18n/zhCN';
 import type { AssetType } from '../utils/assetHelpers';
 import { assetTypeLabels } from '../utils/assetHelpers';
-import { archiveErrorMessage, cleanIntakeDrafts, createOcrDraft, fetchAssetBundle, fileIntakeDraft, fileIntakeDraftBatchSafe, flattenAssets, listImportHistory, listIntakeDrafts, listOcrDesignTypes, mergeDossiers, parseIntakeFile, preflightIntake, previewOcrDraft, rejectIntakeDraft, saveIntakeDrafts, saveOcrText, updateIntakeDraft, uploadFiles, type AssetBundle, type ImportHistoryRecord, type IntakeDraft, type OcrDesignType, type OcrDraftPreview, type UploadedFileRecord } from '../utils/api';
+import { archiveErrorMessage, cleanIntakeDrafts, createOcrDraft, fetchAssetBundle, fileIntakeDraft, fileIntakeDraftBatchSafe, flattenAssets, listImportHistory, listIntakeDrafts, listOcrDesignTypes, mergeDossiers, parseIntakeFile, preflightIntake, previewOcrDraft, rejectIntakeDraft, runOcr, saveIntakeDrafts, saveOcrText, updateIntakeDraft, uploadFiles, type AssetBundle, type ImportHistoryRecord, type IntakeDraft, type OcrDesignType, type OcrDraftPreview, type UploadedFileRecord } from '../utils/api';
 import { detectDuplicates } from '../utils/duplicateDetection';
 import { getCompleteness } from '../utils/completeness';
 import { clipboardImageFromEvent, mergeUploadedIntoFiles, notifyClipboardError, uploadClipboardScreenshot } from '../utils/clipboardEvidence';
@@ -148,7 +148,7 @@ export function EvidenceIntake({ bundle, files, apiOnline, onFilesChanged, onAss
 
   const saveText = async () => {
     if (!currentImage) return notify({ tone: 'error', title: '请先粘贴截图。' });
-    if (!manualText.trim()) return notify({ tone: 'error', title: '请粘贴识别文本后再分析。' });
+    if (!manualText.trim()) return notify({ tone: 'error', title: '请先自动识别文字，或手动粘贴文本后再分析。' });
     setBusy(true);
     try {
       await saveOcrText(currentImage.id, { text: manualText.trim(), status: 'manual_fallback', language: 'auto' });
@@ -156,6 +156,21 @@ export function EvidenceIntake({ bundle, files, apiOnline, onFilesChanged, onAss
       notify({ tone: 'success', title: '文本保存成功', detail: '下一步：分析资料卡片 / 返回修改文本' });
     } catch (error) { notify({ tone: 'error', title: archiveErrorMessage(error, '保存文本失败。') }); }
     finally { setBusy(false); }
+  };
+
+  const runWindowsOcrForCurrentImage = async () => {
+    if (!currentImage) return notify({ tone: 'error', title: '请先粘贴截图。' });
+    setBusy(true);
+    try {
+      const result = await runOcr({ fileId: currentImage.id, provider: 'winocr-powershell', language: 'zh-Hans', preprocess: 'scale2', psmMode: 'block' });
+      const recognized = result.cleanedText || result.text || result.sourceOcrText || '';
+      setManualText(recognized);
+      setWizardTask({ ...task, text: recognized, step: 2 });
+      notify({ tone: result.status === 'done' ? 'success' : 'info', title: result.status === 'done' ? 'Windows OCR 已识别，请校对后继续。' : 'Windows OCR 未识别到文本，请手动粘贴。', detail: result.error || currentImage.name });
+    } catch (error) {
+      notify({ tone: 'error', title: archiveErrorMessage(error, 'Windows OCR 识别失败，请手动粘贴文本。') });
+      setWizardTask({ ...task, step: 2 });
+    } finally { setBusy(false); }
   };
 
   const cleanText = () => {
@@ -301,11 +316,11 @@ export function EvidenceIntake({ bundle, files, apiOnline, onFilesChanged, onAss
       {showResume ? <div className="dossier-panel border-crimson/40 bg-crimson/5 p-4"><p className="font-bold text-espresso">发现未完成的截图入库任务，是否继续？</p><div className="mt-3 flex gap-2"><button className="stamp border-crimson text-crimson" onClick={() => { setShowResume(false); scrollToWizard(); }}>继续</button><button className="stamp border-brass text-brass" onClick={() => { setShowResume(false); abandonTask(); }}>放弃</button></div></div> : null}
 
       <div ref={wizardRef} className="dossier-panel p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-brass/30 pb-4"><div><p className="type-label text-crimson">截图入库向导</p><h3 className="font-display text-2xl text-espresso">截图 → 粘贴识别文本 → 生成资料卡片</h3></div><div className="flex flex-wrap items-center gap-2"><StepBadge step={1} label="粘贴截图" /><span className="text-walnut/40">→</span><StepBadge step={2} label="粘贴文本" /><span className="text-walnut/40">→</span><StepBadge step={3} label="生成草稿" /></div></div>
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-brass/30 pb-4"><div><p className="type-label text-crimson">截图入库向导</p><h3 className="font-display text-2xl text-espresso">截图 → Windows OCR / 手动粘贴 → 字段校对 → 生成草稿</h3></div><div className="flex flex-wrap items-center gap-2"><StepBadge step={1} label="粘贴截图" /><span className="text-walnut/40">→</span><StepBadge step={2} label="识别文字" /><span className="text-walnut/40">→</span><StepBadge step={3} label="生成草稿" /></div></div>
         <div className="mt-4 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
           <div className="border border-brass/25 bg-paper/70 p-4"><p className="type-label text-crimson">当前截图</p>{currentImage ? <><button className="mt-2 w-full border border-walnut/20 bg-paper p-2" onClick={() => setLightboxFile(currentImage)}><img src={currentImage.url} alt={currentImage.name} className="max-h-72 w-full object-contain sepia" /></button><p className="mt-2 break-all text-xs text-walnut/70">{currentImage.name}</p><p className="text-xs text-walnut/60">来源：剪贴板截图 / Evidence</p></> : <p className="mt-3 border border-dashed border-walnut/30 bg-espresso/5 p-4 text-sm text-walnut/60">请先粘贴截图。</p>}<div className="mt-3 flex flex-wrap gap-2"><button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={busy || !apiOnline} onClick={() => void pasteScreenshot()}>粘贴截图</button>{currentImage ? <button className="stamp border-brass text-brass" onClick={() => setLightboxFile(currentImage)}>查看原图</button> : null}</div><p className="mt-2 text-xs text-walnut/70">使用 Windows 截图或 Snipaste 后，回到这里按 Ctrl+V。截图保存成功后会自动进入步骤 2。</p></div>
           <div className="grid gap-4">
-            <div className="border border-brass/25 bg-paper/70 p-4"><p className="type-label text-crimson">识别文本</p><textarea className="paper-input mt-3 min-h-52" placeholder="粘贴文本：把外部 OCR 识别结果贴在这里。" value={manualText} onChange={(e) => setWizardTask({ ...task, text: e.target.value })} /><div className="mt-3 flex flex-wrap gap-2"><button className="stamp border-brass text-brass disabled:opacity-50" disabled={!currentImage || !manualText.trim() || busy} onClick={() => void saveText()}>粘贴文本</button><button className="stamp border-brass text-brass disabled:opacity-50" disabled={!manualText.trim() || busy} onClick={cleanText}>清洗文本</button><button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!currentImage || !manualText.trim() || busy} onClick={() => void analyzeText()}>分析资料</button></div>{!manualText.trim() ? <p className="mt-2 text-xs text-crimson">请粘贴识别文本后再分析。</p> : <p className="mt-2 text-xs text-walnut/70">文本保存成功后，下一步：分析资料卡片；也可以返回修改文本。</p>}</div>
+            <div className="border border-brass/25 bg-paper/70 p-4"><p className="type-label text-crimson">识别文本</p><textarea className="paper-input mt-3 min-h-52" placeholder="粘贴文本：把外部 OCR 识别结果贴在这里。" value={manualText} onChange={(e) => setWizardTask({ ...task, text: e.target.value })} /><div className="mt-3 flex flex-wrap gap-2"><button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!currentImage || busy} onClick={() => void runWindowsOcrForCurrentImage()}>自动识别文字</button><button className="stamp border-brass text-brass disabled:opacity-50" disabled={!currentImage || !manualText.trim() || busy} onClick={() => void saveText()}>手动粘贴文本</button><button className="stamp border-brass text-brass disabled:opacity-50" disabled={!manualText.trim() || busy} onClick={cleanText}>清洗文本</button><button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!currentImage || !manualText.trim() || busy} onClick={() => void analyzeText()}>分析资料</button></div>{!manualText.trim() ? <p className="mt-2 text-xs text-crimson">请粘贴识别文本后再分析。</p> : <p className="mt-2 text-xs text-walnut/70">文本保存成功后，下一步：分析资料卡片；也可以返回修改文本。</p>}</div>
             <div className="border border-brass/25 bg-paper/70 p-4"><p className="type-label text-crimson">资料卡片</p><div className="mt-3 grid gap-3 md:grid-cols-2"><label><span className="field-label">资料类型</span><select className="paper-input" value={task.designType} onChange={(e) => setWizardTask({ ...task, designType: e.target.value })}>{types.length ? types.map((item) => <option key={item.id} value={item.id}>{item.label}</option>) : <option value="other_design">其他资料</option>}</select></label><div className="border border-walnut/20 bg-espresso/5 p-3 text-sm text-walnut/70">{preview ? <>已生成资料卡片预览：{assetTypeLabels[preview.targetType]} · {String(preview.asset.name || '未命名')}</> : '还没有生成草稿。请先点击“分析资料”。'}</div></div><div className="mt-3 flex flex-wrap gap-2"><button className="stamp border-brass text-brass disabled:opacity-50" disabled={!preview} onClick={() => setPreviewOpen(true)}>修改字段</button><button className="stamp border-crimson text-crimson disabled:opacity-50" disabled={!currentImage || !manualText.trim() || busy} onClick={() => preview ? void generateDraft() : void analyzeText()}>生成草稿</button>{task.draftId ? <button className="stamp border-brass text-brass" onClick={scrollToDrafts}>审核草稿</button> : null}</div></div>
           </div>
         </div>
